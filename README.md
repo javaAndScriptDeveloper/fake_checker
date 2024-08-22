@@ -1,0 +1,1 @@
+stack: postgres with materialized view

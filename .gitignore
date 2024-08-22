@@ -1,0 +1,5 @@
+databridge/session*
+__pycache__/
+.idea/
+*.session
+*.env

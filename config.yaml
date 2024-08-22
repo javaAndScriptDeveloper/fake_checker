@@ -1,0 +1,14 @@
+coefficient:
+  sentimental_score: 0.65
+  triggered_keywords: 0.1
+  triggered_topics: 0.05
+  text_simplicity_deviation: 0.05
+  confidence_factor: 0.05
+  clickbait: 0.05
+  subjective: 0.05
+average_news_simplicity: 50
+tg:
+  channel_names:
+    - tmp12345678t
+    - qwerty98754321
+    - pandoras_box_ua
