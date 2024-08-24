@@ -1,1 +1,1 @@
-stack: postgres with materialized view
+script to check texts on fake
