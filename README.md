@@ -1,1 +1,1 @@
-script to check texts on fake
+script to check text data on fake
