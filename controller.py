@@ -1,8 +1,8 @@
-from flask import Flask, render_template, jsonify
-from flask_socketio import emit, SocketIO
+from flask import Flask, jsonify, render_template
+from flask_socketio import SocketIO, emit
 
 from core.enums import PLATFORM_TYPE
-from core.singletons import source_dao, evaluation_processor, note_dao
+from core.singletons import evaluation_processor, note_dao, source_dao
 from databridge.data_producer import DataProducer
 from mapper.mapper import NoteMapper
 from model.model import DataMessage, ProduceDataMessagesCommand

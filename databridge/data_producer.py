@@ -1,16 +1,17 @@
+import asyncio
 import logging
 import sys
 from abc import ABC, abstractmethod
-from telethon.sync import TelegramClient
+
 from telethon.errors.rpcerrorlist import ChannelPrivateError
+from telethon.sync import TelegramClient
 
 import mapper.mapper
 from config import config
-import asyncio
-
 from core.enums import PLATFORM_TYPE
 from exception.exceptions import NotSupportedPlatformTypeException
 from model.model import DataMessage, ProduceDataMessagesCommand
+
 
 class AbstractParser(ABC):
 

@@ -1,6 +1,6 @@
 from telegram import Message
 
-from core.core import EvaluationContext, CalculationUtils
+from core.core import CalculationUtils, EvaluationContext
 from core.enums import PLATFORM_TYPE
 from dal.dal import Note
 from model.model import DataMessage
@@ -19,8 +19,12 @@ class NoteMapper:
         note.triggered_topics = evaluationContext.trigger_topics_result
         note.clickbait = evaluationContext.clickbait_result
         note.subjective = evaluationContext.subjective_result
+        note.call_to_action = evaluationContext.call_to_action_result
+        note.repeated_take = evaluationContext.repeated_take_result
+        note.repeated_note = evaluationContext.repeated_note_result
         note.total_score = CalculationUtils.calculate_total_score(note)
         return note
+
 
 class ParserMapper:
 
@@ -30,5 +34,3 @@ class ParserMapper:
         data_message.source_external_id = message.sender.id
         data_message.text_content = message.text if message.text is not None else ""
         return data_message
-
-

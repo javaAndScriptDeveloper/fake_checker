@@ -1,6 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, func, MetaData, ForeignKey, Numeric, Text, text
-from sqlalchemy.orm import DeclarativeBase, Session
 from automapper import mapper
+from sqlalchemy import (Column, DateTime, ForeignKey, Integer, MetaData,
+                        Numeric, String, Text, create_engine, func, text)
+from sqlalchemy.orm import DeclarativeBase, Session
 
 engine = create_engine('postgresql://postgres:password@localhost:5432/fake_checker')
 
@@ -39,6 +40,9 @@ class Note(Base):
     confidence_factor = Column(Numeric, default=100)
     clickbait = Column(Numeric, default=0)
     subjective = Column(Numeric, default=0)
+    call_to_action = Column(Numeric, default=0)
+    repeated_take = Column(Numeric, default=0)
+    repeated_note = Column(Numeric, default=0)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -50,6 +54,9 @@ class Note(Base):
             + f'confidence_factor: {self.confidence_factor},\n' \
             + f'clickbait: {self.clickbait},\n' \
             + f'subjective: {self.subjective},\n' \
+            + f'call_to_action: {self.call_to_action},\n' \
+            + f'repeated_take: {self.repeated_take},\n' \
+            + f'repeated_note: {self.repeated_note},\n' \
             + f'total_score: {self.total_score},\n'
 
 Base.metadata.create_all(engine)

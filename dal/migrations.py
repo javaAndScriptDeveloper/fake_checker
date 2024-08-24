@@ -1,6 +1,6 @@
 from core.enums import PLATFORM_TYPE
-from core.singletons import source_dao, note_dao
-from dal.dal import Source, Note
+from core.singletons import note_dao, source_dao
+from dal.dal import Note, Source
 
 
 def clean_tables():
