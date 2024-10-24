@@ -79,7 +79,7 @@ class SentimentalAnalysis(Evaluation):
         start_time = time.perf_counter()
         sentiment_pipeline = pipeline("sentiment-analysis")
         result = sentiment_pipeline([evaluation_context.data])[0]
-        evaluation_context.sentimental_analysis_result = abs(-1 * result['score'])
+        evaluation_context.sentimental_analysis_result = result['score']
         end_time = time.perf_counter()
         evaluation_context.sentimental_analysis_execution_time = end_time - start_time
 
@@ -89,7 +89,7 @@ class TriggerKeywords(Evaluation):
     def parse_config(self):
         with open('trigger_keywords.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
-        return data.get("language", {}).get("russian", [])
+        return data.get("language", {}).get("english", [])
 
     def count_and_divide(self, data, words_to_count):
         # Split the text into words
@@ -107,7 +107,7 @@ class TriggerKeywords(Evaluation):
         # Divide the total word count by the total number of words
         occurrences_ratio = total_word_count / total_words
 
-        return occurrences_ratio
+        return occurrences_ratio * 100
 
     def evaluate(self, evaluation_context):
         trigger_keywords = self.parse_config()
@@ -143,7 +143,7 @@ class ClickBait(Evaluation):
 
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
-        evaluation_context.clickbait_result = self.classifier(evaluation_context.data)[0]['score']
+        evaluation_context.clickbait_result = self.classifier(evaluation_context.data)[0]['score'] * 100
         end_time = time.perf_counter()
         evaluation_context.clickbait_execution_time = end_time - start_time
 
@@ -153,7 +153,7 @@ class Subjective(Evaluation):
 
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
-        evaluation_context.subjective_result = self.classifier(evaluation_context.data)[0]['score']
+        evaluation_context.subjective_result = self.classifier(evaluation_context.data)[0]['score'] * 100
         end_time = time.perf_counter()
         evaluation_context.subjective_execution_time = end_time - start_time
 
@@ -163,7 +163,7 @@ class TextSimplicity(Evaluation):
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
         grade_level = textstat.flesch_reading_ease(evaluation_context.data)
-        evaluation_context.text_simplicity_deviation = abs(config.average_news_simplicity - grade_level) / 100
+        evaluation_context.text_simplicity_deviation = abs(config.average_news_simplicity - grade_level)
         end_time = time.perf_counter()
         evaluation_context.text_simplicity_deviation_execution_time = end_time - start_time
 
@@ -209,7 +209,7 @@ class CallToAction(Evaluation):
             cta_counts = sum(1 for sentence in sentences if self.is_call_to_action(sentence.text))
             total_sentences = len(sentences)
 
-            evaluation_context.call_to_action_result = cta_counts / total_sentences
+            evaluation_context.call_to_action_result = cta_counts / total_sentences * 100
         else:
             evaluation_context.call_to_action_result = 0
 
@@ -241,7 +241,7 @@ class RepeatedNote(Evaluation):
         start_time = time.perf_counter()
         notes_from_source = evaluation_context.note_dao.get_by_source_id(evaluation_context.source_id)
         repeated_notes = self.check_similarity(evaluation_context.data, [note.content for note in notes_from_source])
-        evaluation_context.repeated_note_result = 1 if len(repeated_notes) > 0 else 0
+        evaluation_context.repeated_note_result = 100 if len(repeated_notes) > 0 else 0
         end_time = time.perf_counter()
         evaluation_context.confidence_factor_execution_time = end_time - start_time
 
@@ -284,7 +284,7 @@ class RepeatedTake(Evaluation):
         # Check for repeated sentences
         repeated_sentence_indices = self.find_repeated_sentences(sentences)
 
-        evaluation_context.repeated_take_result = len(repeated_sentence_indices) / len(sentences)
+        evaluation_context.repeated_take_result = len(repeated_sentence_indices) / len(sentences) * 100
 
         end_time = time.perf_counter()
         evaluation_context.repeated_take_execution_time = end_time - start_time
@@ -310,10 +310,28 @@ class EvaluationProcessor:
 class CalculationUtils:
 
     def calculate_total_score(note: Note):
-        return note.sentimental_score * config.sentimental_score_coeff \
-            + note.triggered_keywords * config.triggered_keywords_coeff \
-            + note.triggered_topics * config.triggered_topics_coeff \
-            + note.text_simplicity_deviation * config.text_simplicity_deviation \
-            + note.clickbait * config.clickbait_coeff \
-            + note.subjective * config.subjective_coeff \
-            + float(note.confidence_factor) * config.confidence_factor_coeff
+        total_score = note.sentimental_score * config.sentimental_score_coeff \
+                      + note.triggered_keywords * config.triggered_keywords_coeff \
+                      + note.triggered_topics * config.triggered_topics_coeff \
+                      + note.text_simplicity_deviation * config.text_simplicity_deviation \
+                      + note.clickbait * config.clickbait_coeff \
+                      + note.subjective * config.subjective_coeff \
+                      + note.call_to_action * config.call_to_action_coeff \
+                      + note.repeated_take * config.repeated_take_coeff \
+                      + note.repeated_note * config.repeated_note_coeff \
+                      + float(note.confidence_factor) * config.confidence_factor_coeff
+
+        print(
+            f"sentimental score ({note.sentimental_score}) * sentimental score coeff ({config.sentimental_score_coeff}) = {note.sentimental_score * config.sentimental_score_coeff}\n"
+            + f"triggered topics ({note.triggered_topics}) * triggered topics coeff ({config.triggered_topics_coeff}) = {note.triggered_topics * config.triggered_topics_coeff}\n"
+            + f"text simplicity deviation ({note.text_simplicity_deviation}) * text simplicity deviation coeff ({config.text_simplicity_deviation}) = {note.text_simplicity_deviation * config.text_simplicity_deviation}\n"
+            + f"clickbait ({note.clickbait}) * clickbait coeff ({config.clickbait_coeff}) = {note.clickbait * config.clickbait_coeff}\n"
+            + f"subjective ({note.subjective}) * subjective coeff ({config.subjective_coeff}) = {note.subjective * config.subjective_coeff}\n"
+            + f"confidence factor ({float(note.confidence_factor)}) * confidence factor coeff ({config.confidence_factor_coeff}) = {float(note.confidence_factor) * config.confidence_factor_coeff}\n"
+            + f"triggered keywords ({note.triggered_keywords}) * triggered keywords coeff ({config.triggered_keywords_coeff}) = {note.triggered_keywords * config.triggered_keywords_coeff})\n"
+            + f"сall to action ({note.call_to_action}) * сall to action coeff ({config.call_to_action_coeff}) = {note.call_to_action * config.call_to_action_coeff})\n"
+            + f"repeated take ({note.repeated_take}) * repeated take ({config.repeated_take_coeff}) = {note.repeated_take * config.repeated_take_coeff})\n"
+            + f"repeated note ({note.repeated_note}) * repated note ({config.repeated_note_coeff}) = {note.repeated_note * config.repeated_note_coeff})\n"
+            + f"total score = {total_score}")
+
+        return total_score

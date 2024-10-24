@@ -21,6 +21,7 @@ class Config:
         self.call_to_action_coeff = None
         self.repeated_take_coeff = None
         self.repeated_note_coeff = None
+        self.total_coeff = None
         self.average_news_simplicity = None
         self.text_simplicity = None
         self.similarity_threshold = None
@@ -39,6 +40,15 @@ config.subjective_coeff = config_file['coefficient']['subjective']
 config.call_to_action_coeff = config_file['coefficient']['call_to_action']
 config.repeated_take_coeff = config_file['coefficient']['repeated_take']
 config.repeated_note_coeff = config_file['coefficient']['repeated_note']
+config.total_coeff = (config.sentimental_score_coeff \
+                     + config.triggered_keywords_coeff \
+                     + config.triggered_topics_coeff \
+                     + config.confidence_factor_coeff \
+                     + config.clickbait_coeff \
+                     + config.subjective_coeff \
+                     + config.call_to_action_coeff \
+                     + config.repeated_take_coeff \
+                     + config.repeated_note_coeff)
 config.text_simplicity_deviation = config_file['coefficient']['text_simplicity_deviation']
 config.average_news_simplicity = config_file['average_news_simplicity']
 config.similarity_threshold = config_file['similarity_threshold']

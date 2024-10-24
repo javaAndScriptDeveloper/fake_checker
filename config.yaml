@@ -1,14 +1,14 @@
 coefficient:
-  sentimental_score: 0.55
-  triggered_keywords: 0.05
-  triggered_topics: 0.05
-  text_simplicity_deviation: 0.05
-  confidence_factor: 0.05
-  clickbait: 0.05
-  subjective: 0.05
-  call_to_action: 0.05
-  repeated_take: 0.05
-  repeated_note: 0.05
+  sentimental_score: 0.00088
+  triggered_keywords: 0.0025
+  triggered_topics: 0.109
+  text_simplicity_deviation: 0.00166
+  confidence_factor: 0.6236
+  clickbait: 0.0587
+  subjective: 0.057
+  call_to_action: 0.0182
+  repeated_take: 0.0182
+  repeated_note: 0.1094
 similarity_threshold : 0.85
 average_news_simplicity: 50
 tg:

@@ -31,33 +31,33 @@ class Note(Base):
     __tablename__ = "notes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     content = Column(String, nullable=False)
-    sentimental_score = Column(Numeric, default=0)
-    triggered_keywords = Column(Numeric, default=0)
-    triggered_topics = Column(Numeric, default=0)
-    text_simplicity_deviation = Column(Numeric, default=0)
+    sentimental_score = Column(Numeric, default=0) # x2
+    triggered_keywords = Column(Numeric, default=0) # x
+    triggered_topics = Column(Numeric, default=0) # x7
+    text_simplicity_deviation = Column(Numeric, default=0) # x5
+    confidence_factor = Column(Numeric, default=100) # x6
+    clickbait = Column(Numeric, default=0) # x10
+    subjective = Column(Numeric, default=0) # x1
+    call_to_action = Column(Numeric, default=0) # x8
+    repeated_take = Column(Numeric, default=0) # x3
+    repeated_note = Column(Numeric, default=0) # x4
     total_score = Column(Numeric, default=50)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
-    confidence_factor = Column(Numeric, default=100)
-    clickbait = Column(Numeric, default=0)
-    subjective = Column(Numeric, default=0)
-    call_to_action = Column(Numeric, default=0)
-    repeated_take = Column(Numeric, default=0)
-    repeated_note = Column(Numeric, default=0)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     def __str__(self) -> str:
-        return f'sentimental_score: {self.sentimental_score},\n' \
-            + f'triggered_keywords: {self.triggered_keywords},\n' \
-            + f'triggered_topics: {self.triggered_topics},\n' \
-            + f'text_simplicity_deviation: {self.text_simplicity_deviation},\n' \
-            + f'confidence_factor: {self.confidence_factor},\n' \
-            + f'clickbait: {self.clickbait},\n' \
-            + f'subjective: {self.subjective},\n' \
-            + f'call_to_action: {self.call_to_action},\n' \
-            + f'repeated_take: {self.repeated_take},\n' \
-            + f'repeated_note: {self.repeated_note},\n' \
-            + f'total_score: {self.total_score},\n'
+        return f'sentimental_score: {int(self.sentimental_score * 100)}%,\n' \
+            + f'triggered_keywords: {self.triggered_keywords}%,\n' \
+            + f'triggered_topics: {int(self.triggered_topics)}%,\n' \
+            + f'text_simplicity_deviation: {int(self.text_simplicity_deviation)}%,\n' \
+            + f'confidence_factor: {int(self.confidence_factor)}%,\n' \
+            + f'clickbait: {int(self.clickbait)}%,\n' \
+            + f'subjective: {int(self.subjective)}%,\n' \
+            + f'call_to_action: {int(self.call_to_action)}%,\n' \
+            + f'repeated_take: {int(self.repeated_take)}%,\n' \
+            + f'repeated_note: {int(self.repeated_note)}%,\n' \
+            + f'total_score: {int(self.total_score)}%,\n'
 
 Base.metadata.create_all(engine)
 
