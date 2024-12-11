@@ -20,6 +20,9 @@ def read_file_to_variable(file_path):
 source = Source(id=1, name='1', external_id="1", platform=PLATFORM_TYPE.TELEGRAM.name)
 source_dao.save(source)
 
+source = Source(id=2, name='2', external_id="2", platform=PLATFORM_TYPE.TELEGRAM.name)
+source_dao.save(source)
+
 """
 context = evaluation_processor.evaluate(text, source.id)
 note = NoteMapper.mapEvaluationContext(context)
@@ -30,6 +33,18 @@ note_dao.save(note)
 
 def process(text, source_id):
     context = evaluation_processor.evaluate(text, source_id)
-    note = NoteMapper.mapEvaluationContext(context)
+    note, calculation_object = NoteMapper.mapEvaluationContext(context)
     note_dao.save(note)
-    return note
+    calculation_object['is_propaganda'] = note.total_score > note_dao.get_average_rating()
+    return note, calculation_object
+
+def get_sources_with_ratings():
+    sources = source_dao.get_all()
+    source_ratings = {}
+    for i in sources:
+        notes = note_dao.get_by_source_id(i.id)
+        if(notes):
+            total_scores = [note.total_score for note in notes]
+            rating = sum(total_scores) / len(total_scores)
+            source_ratings[i] = rating
+    return source_ratings

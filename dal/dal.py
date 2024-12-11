@@ -82,6 +82,13 @@ class NoteDao(BaseDao):
     def get_by_source_id(self, source_id):
         return self.session.query(Note).filter_by(source_id=source_id).all()
 
+    def get_average_rating(self):
+        notes = self.session.query(Note).all()
+        if not notes:
+            return 100
+        total_scores = [note.total_score for note in notes]
+        return sum(total_scores) / len(total_scores)
+
     def update(self, model_to_update):
         model_from_db = self.get_by_id(model_to_update.__class__, model_to_update.id)
         model_from_db.name = model_to_update.name

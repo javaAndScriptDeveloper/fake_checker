@@ -7,6 +7,7 @@ import numpy as np
 import spacy
 import textstat
 from sklearn.metrics.pairwise import cosine_similarity
+from textblob import TextBlob
 from transformers import pipeline
 
 from config import config
@@ -72,7 +73,6 @@ class Evaluation(ABC):
     def evaluate(self, evaluation_context: EvaluationContext):
         pass
 
-
 class SentimentalAnalysis(Evaluation):
 
     def evaluate(self, evaluation_context):
@@ -127,13 +127,16 @@ class TriggerTopics(Evaluation):
 
     def resolve_topics(self, text) -> list:
         topics = self.parse_config()
-        result = self.classifier(text, topics)
-        return result['labels'][0]
+        result = self.classifier(text, ["finance", "sports", "politics", "technology", "health", "entertainment"])
+        sum_value = 0
+        for topic in topics:
+            position = result['labels'].index(topic)
+            sum_value += result['scores'][position]
+        return sum_value
 
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
-        resolved_topics = self.resolve_topics(evaluation_context.data)
-        evaluation_context.trigger_topics_result = 100 if len(resolved_topics) > 0 else 0
+        evaluation_context.trigger_topics_result = self.resolve_topics(evaluation_context.data)
         end_time = time.perf_counter()
         evaluation_context.trigger_topics_execution_time = end_time - start_time
 
@@ -149,11 +152,11 @@ class ClickBait(Evaluation):
 
 
 class Subjective(Evaluation):
-    classifier = pipeline("text-classification", model="roberta-base")
 
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
-        evaluation_context.subjective_result = self.classifier(evaluation_context.data)[0]['score'] * 100
+        blob = TextBlob(evaluation_context.data)
+        evaluation_context.subjective_result = blob.sentiment.subjectivity
         end_time = time.perf_counter()
         evaluation_context.subjective_execution_time = end_time - start_time
 
@@ -177,7 +180,7 @@ class ConfidenceFactor(Evaluation):
             total_scores = [note.total_score for note in notes]
             evaluation_context.confidence_factor = sum(total_scores) / len(total_scores)
         else:
-            evaluation_context.confidence_factor = 100
+            evaluation_context.confidence_factor = 0
         end_time = time.perf_counter()
         evaluation_context.confidence_factor_execution_time = end_time - start_time
 
@@ -334,4 +337,17 @@ class CalculationUtils:
             + f"repeated note ({note.repeated_note}) * repated note ({config.repeated_note_coeff}) = {note.repeated_note * config.repeated_note_coeff})\n"
             + f"total score = {total_score}")
 
-        return total_score
+        calculation_object = {
+            'sentimental_score': f"({round(note.sentimental_score, 3)}) * coeff ({round(config.sentimental_score_coeff, 3)}) = {round(note.sentimental_score * config.sentimental_score_coeff, 3)}",
+            'triggered_topics': f"({round(note.triggered_topics, 3)}) * coeff ({round(config.triggered_topics_coeff, 3)}) = {round(note.triggered_topics * config.triggered_topics_coeff, 3)}",
+            'text_simplicity_deviation': f"({round(note.text_simplicity_deviation, 3)}) * coeff ({round(config.text_simplicity_deviation, 3)}) = {round(note.text_simplicity_deviation * config.text_simplicity_deviation, 3)}",
+            'clickbait': f"({round(note.clickbait, 3)}) * coeff ({round(config.clickbait_coeff, 3)}) = {round(note.clickbait * config.clickbait_coeff, 3)}",
+            'subjective': f"({round(note.subjective, 3)}) * coeff ({round(config.subjective_coeff, 3)}) = {round(note.subjective * config.subjective_coeff, 3)}",
+            'confidence_factor': f"({round(float(note.confidence_factor), 3)}) * coeff ({round(config.confidence_factor_coeff, 3)}) = {round(float(note.confidence_factor) * config.confidence_factor_coeff, 3)}",
+            'triggered_keywords': f"({round(note.triggered_keywords, 3)}) * coeff ({round(config.triggered_keywords_coeff, 3)}) = {round(note.triggered_keywords * config.triggered_keywords_coeff, 3)}",
+            'call_to_action': f"({round(note.call_to_action, 3)}) * coeff ({round(config.call_to_action_coeff, 3)}) = {round(note.call_to_action * config.call_to_action_coeff, 3)}",
+            'repeated_take': f"({round(note.repeated_take, 3)}) * coeff ({round(config.repeated_take_coeff, 3)}) = {round(note.repeated_take * config.repeated_take_coeff, 3)}",
+            'repeated_note': f"({round(note.repeated_note, 3)}) * coeff ({round(config.repeated_note_coeff, 3)}) = {round(note.repeated_note * config.repeated_note_coeff, 3)}",
+            'total_score': f"{round(total_score, 3)}"
+        }
+        return total_score,calculation_object

@@ -22,8 +22,8 @@ class NoteMapper:
         note.call_to_action = evaluationContext.call_to_action_result
         note.repeated_take = evaluationContext.repeated_take_result
         note.repeated_note = evaluationContext.repeated_note_result
-        note.total_score = CalculationUtils.calculate_total_score(note)
-        return note
+        note.total_score, calculation_object = CalculationUtils.calculate_total_score(note)
+        return note, calculation_object
 
 
 class ParserMapper:
