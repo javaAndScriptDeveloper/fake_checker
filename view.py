@@ -10,29 +10,89 @@ from PyQt5.QtWidgets import (
 )
 from core.enums import PLATFORM_TYPE
 from dal.dal import Source
-from main import process, get_sources_with_ratings
+from main import process, get_sources_with_ratings, get_sources
 
 cold_start_texts = [
-    "/home/vampir/lolitech/dissertation/data/den_braun.txt",
-    "/home/vampir/lolitech/dissertation/data/palannik.txt",
-    "/home/vampir/lolitech/dissertation/data/putler.txt",
-    "/home/vampir/lolitech/dissertation/data/dugin.txt",
-    "/home/vampir/lolitech/dissertation/data/lavrov.txt",
-    "/home/vampir/lolitech/dissertation/data/puthin-west-threat.txt",
-    "/home/vampir/lolitech/dissertation/data/math.txt",
-    "/home/vampir/lolitech/dissertation/data/center-harward-football-match.txt",
-    "/home/vampir/lolitech/dissertation/data/touchdown.txt",
-    "/home/vampir/lolitech/dissertation/data/yak.txt",
-    "/home/vampir/lolitech/dissertation/data/trump-speech.txt",
-    "/home/vampir/lolitech/dissertation/data/number-theory.txt",
-    "/home/vampir/lolitech/dissertation/data/kennedy-goodwill-tour.txt",
-    "/home/vampir/lolitech/dissertation/data/ross-mihara.txt",
-    "/home/vampir/lolitech/dissertation/data/hariss-confession.txt",
-    "/home/vampir/lolitech/dissertation/data/scott-ritter.txt",
-    "/home/vampir/lolitech/dissertation/data/eva-vlaar.txt",
-    "/home/vampir/lolitech/dissertation/data/rothshields.txt",
-    "/home/vampir/lolitech/dissertation/data/wicked-gladiator.txt",
-    "/home/vampir/lolitech/dissertation/data/nova-scotia.txt",
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/den_braun.txt",
+        "source_id": 1
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/palannik.txt",
+        "source_id": 2
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/putler.txt",
+        "source_id": 3
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/dugin.txt",
+        "source_id": 4
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/lavrov.txt",
+        "source_id": 5
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/puthin-west-threat.txt",
+        "source_id": 6
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/math.txt",
+        "source_id": 7
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/center-harward-football-match.txt",
+        "source_id": 8
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/touchdown.txt",
+        "source_id": 9
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/yak.txt",
+        "source_id": 10
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/trump-speech.txt",
+        "source_id": 11
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/number-theory.txt",
+        "source_id": 12
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/kennedy-goodwill-tour.txt",
+        "source_id": 13
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/ross-mihara.txt",
+        "source_id": 14
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/hariss-confession.txt",
+        "source_id": 15
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/scott-ritter.txt",
+        "source_id": 16
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/eva-vlaar.txt",
+        "source_id": 17
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/rothshields.txt",
+        "source_id": 18
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/wicked-gladiator.txt",
+        "source_id": 19
+    },
+    {
+        "path": "/home/vampir/lolitech/dissertation/data/nova-scotia.txt",
+        "source_id": 20
+    }
 ]
 
 def read_file_from_root(absolute_path):
@@ -50,11 +110,7 @@ class AppDemo(QWidget):
         self.setGeometry(100, 100, 600, 400)
 
         # Sample data for the sources dropdown
-        self.sources = [
-            Source(id=1, name='1', external_id="1", platform=PLATFORM_TYPE.TELEGRAM.name),
-            Source(id=2, name='2', external_id="2", platform=PLATFORM_TYPE.TELEGRAM.name)
-        ]
-
+        self.sources = get_sources()
         # Main layout
         self.layout = QVBoxLayout()
 
@@ -177,7 +233,7 @@ class AppDemo(QWidget):
         _, calculation_object = process(input_text, source_id)
 
         # Determine if the input is from the cold start list
-        is_cold_start = input_text in [read_file_from_root(path)[:20] for path in cold_start_texts]
+        is_cold_start = input_text in [read_file_from_root(path["path"])[:20] for path in cold_start_texts]
 
         # Update the text view with the result in HTML format
         result_text = f"""
@@ -224,9 +280,9 @@ class AppDemo(QWidget):
         self.result_table.setItem(row_position, 13, QTableWidgetItem(f"{result['is_propaganda']}%"))
 
     def prepopulate_table(self):
-        for path in cold_start_texts:
-            text = read_file_from_root(path)
-            self.add_result_to_table(text[:40], process(text, 1)[1], True)
+        for i in cold_start_texts:
+            text = read_file_from_root(i["path"])
+            self.add_result_to_table(text[:40], process(text, i["source_id"])[1], True)
 
     def update_ratings(self):
         data = get_sources_with_ratings()

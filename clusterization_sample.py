@@ -3,7 +3,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 
-
 def calculate_similarity_score(text):
     """
     Calculates the similarity score for a given text by splitting it into sentences.
@@ -39,15 +38,7 @@ def calculate_similarity_score(text):
     return max(0, normalized_score)
 
 text_input = """
-Mathematics is a field of study that discovers and organizes methods,
-theories and theorems that are developed and proved for the needs of empirical sciences and mathematics itself.
-There are many areas of mathematics,
-which include number theory (the study of numbers), algebra (the study of formulas and related structures),
-geometry (the study of shapes and spaces that contain them), analysis (the study of continuous changes),
-and set theory (presently used as a foundation for all mathematics).
-Mathematics is a field of study that discovers and organizes methods,
-theories and theorems that are developed and proved for the needs of empirical sciences and mathematics itself.
-There are many areas of mathematics,
+The media will not show the magnitude of this crowd. Even I, when I turned on today, I looked, and I saw thousands of people here, but you don't see hundreds of thousands of people behind you because they don't want to show that. We have hundreds of thousands of people here, and I just want them to be recognized by the fake news media. Turn your cameras please and show what's really happening out here because these people are not going to take it any longer. They're not going to take it any longer. Go ahead. Turn your cameras, please. Would you show? They came from all over the world, actually, but they came from all over our country. I just really want to see what they do. I just want to see how they covered. I've never seen anything like it.
 """
 
 normalized_score = calculate_similarity_score(text_input)

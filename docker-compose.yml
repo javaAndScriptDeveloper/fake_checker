@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  fake-checker:
+    image: bitnami/postgresql:latest
+    container_name: fake-checker
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRESQL_DATABASE: fake_checker
+
+  fake-checker-test:
+    image: bitnami/postgresql:latest
+    container_name: fake-checker-test
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRESQL_DATABASE: fake_checker

@@ -42,6 +42,8 @@ class Note(Base):
     repeated_take = Column(Numeric, default=0) # x3
     repeated_note = Column(Numeric, default=0) # x4
     total_score = Column(Numeric, default=50)
+    cosine_similarity = Column(Numeric, default=0)
+    fehner_coeff = Column(Numeric, default=0)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
