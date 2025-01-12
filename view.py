@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QComboBox, QTextEdit, QPushButton, QLabel,
     QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView
 )
+
+from core.singletons import fehner_processor
 from core.enums import PLATFORM_TYPE
 from dal.dal import Source
 from main import process, get_sources_with_ratings, get_sources
@@ -133,6 +135,10 @@ class AppDemo(QWidget):
         self.init_ratings_tab()
         self.tabs.addTab(self.tab_ratings, "Ratings")
 
+        self.tab_system_info = QWidget()
+        self.init_system_info_tab()
+        self.tabs.addTab(self.tab_system_info, "System Info")
+
         # Prepopulate the table with data on startup
         self.prepopulate_table()
 
@@ -221,6 +227,35 @@ class AppDemo(QWidget):
 
         # Set layout for this tab
         self.tab_ratings.setLayout(ratings_layout)
+
+    def init_system_info_tab(self):
+        """Initialize the System Info tab."""
+        system_info_layout = QVBoxLayout()
+
+        # Label for displaying the Fechner Score
+        self.fechner_label = QLabel("Fehner Score:")
+        self.fechner_label.setStyleSheet("font-weight: bold; font-size: 16px;")
+        system_info_layout.addWidget(self.fechner_label)
+
+        # Label for showing the actual Fechner Score
+        self.fechner_score_value = QLabel("Calculating...")
+        self.fechner_score_value.setStyleSheet("font-size: 16px; color: green;")
+        system_info_layout.addWidget(self.fechner_score_value)
+
+        # Update Fechner Score on tab initialization
+        self.update_fehner_score()
+
+        # Set layout for this tab
+        self.tab_system_info.setLayout(system_info_layout)
+
+    def update_fehner_score(self):
+        """Update the Fechner Score from the calculate function."""
+        try:
+            fehner_score = fehner_processor.calculate_fehner_score()  # Call the calculate function from main
+            self.fechner_score_value.setText(f"{fehner_score}")
+        except Exception as e:
+            self.fechner_score_value.setText(f"Error: {e}")
+            print(f"Error calculating Fechner Score: {e}")
 
     def process_data(self):
         # Get the selected source id

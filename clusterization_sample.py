@@ -41,5 +41,5 @@ text_input = """
 The media will not show the magnitude of this crowd. Even I, when I turned on today, I looked, and I saw thousands of people here, but you don't see hundreds of thousands of people behind you because they don't want to show that. We have hundreds of thousands of people here, and I just want them to be recognized by the fake news media. Turn your cameras please and show what's really happening out here because these people are not going to take it any longer. They're not going to take it any longer. Go ahead. Turn your cameras, please. Would you show? They came from all over the world, actually, but they came from all over our country. I just really want to see what they do. I just want to see how they covered. I've never seen anything like it.
 """
 
-normalized_score = calculate_similarity_score(text_input)
-print(f"Normalized Total Similarity Score (average similarity): {normalized_score:.4f}")
+#normalized_score = calculate_similarity_score(text_input)
+#print(f"Normalized Total Similarity Score (average similarity): {normalized_score:.4f}")

@@ -1,9 +1,10 @@
 from flask import Flask, jsonify, render_template
 from flask_socketio import SocketIO, emit, send
 
+from clusterization_sample import calculate_similarity_score
 from controller import app, socketio
 from core.enums import PLATFORM_TYPE
-from core.singletons import evaluation_processor, note_dao, source_dao
+from core.singletons import evaluation_processor, note_dao, source_dao, fehner_processor
 from dal.dal import Note, NoteDao, Source
 from dal.migrations import clean_tables, save_initial_sources
 from databridge.data_producer import DataProducer, ProduceDataMessagesCommand
@@ -60,8 +61,9 @@ note_dao.save(note)
 def process(text, source_id):
     context = evaluation_processor.evaluate(text, source_id)
     note, calculation_object = NoteMapper.mapEvaluationContext(context)
-    note_dao.save(note)
     calculation_object['is_propaganda'] = note.total_score > note_dao.get_average_rating()
+    fehner_processor.process(note, text)
+    note_dao.save(note)
     return note, calculation_object
 
 def get_sources_with_ratings():

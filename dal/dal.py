@@ -44,6 +44,11 @@ class Note(Base):
     total_score = Column(Numeric, default=50)
     cosine_similarity = Column(Numeric, default=0)
     fehner_coeff = Column(Numeric, default=0)
+    total_score_sum = Column(Numeric, default=0)
+    cosine_similarity_sum = Column(Numeric, default=0)
+    total_score_size = Column(Numeric, default=0)
+    cosine_similarity_size = Column(Numeric, default=0)
+    fehner_type = Column(String)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -78,6 +83,9 @@ class BaseDao:
 
 class NoteDao(BaseDao):
 
+    def get_notes(self):
+        return self.session.query(Note).all()
+
     def get_by_id(self, record_id):
         return super().get_by_id(Note, record_id)
 
@@ -103,6 +111,14 @@ class NoteDao(BaseDao):
                 self.session.add_all(models_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
+
+    def get_last_note(self):
+        return (
+            self.session.query(Note)
+            .order_by(Note.created_at.desc())
+            .first()
+        )
+
 
 
 class SourceDao(BaseDao):
