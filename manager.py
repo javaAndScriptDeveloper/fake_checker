@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 
@@ -18,6 +19,7 @@ class Manager:
         self.fehner_processor = fehner_processor
 
         self.coldstart("/home/vampir/lolitech/dissertation/data/coldstart")
+        self.process_initial("/home/vampir/lolitech/dissertation/data/initial")
 
     def coldstart(self, path_to_coldstart_files):
         for filename in os.listdir(path_to_coldstart_files):
@@ -31,13 +33,34 @@ class Manager:
             except Exception as e:
                 print(f"Error reading {filename}: {e}")
 
+    def process_initial(self, path_to_pre_saved):
+        for filename in os.listdir(path_to_pre_saved):
+            file_path = os.path.join(path_to_pre_saved, filename)
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.process(data.get('content'), data.get('source_id'))
+
+                    print(f"Processed initial file: {filename}")
+            except Exception as e:
+                print(f"Error reading {filename}: {e}")
+
     def process(self, text, source_id):
+        hash = self._resolve_text_hash(text)
+        text_by_hash = self.note_dao.get_by_hash(hash)
+        if text_by_hash is not None:
+            print(f"Skipped processing already processed text: {text[:16]}...")
+            return text_by_hash
         evaluation_context = self.evaluation_processor.evaluate(text, source_id)
         note = Note()
         note = self._mapEvaluationContext(evaluation_context, note)
         self.fehner_processor.process(text, note)
+        note.hash = hash
         self.note_dao.save(note)
         return note
+
+    def _resolve_text_hash(self, text: str) -> str:
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
 
     def _mapEvaluationContext(self, evaluationContext: EvaluationContext, note: Note):
         note.content = evaluationContext.data

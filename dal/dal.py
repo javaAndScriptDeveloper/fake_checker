@@ -40,13 +40,13 @@ class Note(Base):
     repeated_note = Column(Numeric, default=0)  # x4
     total_score = Column(Numeric, default=50)
     cosine_similarity = Column(Numeric, default=0)
-    fehner_coeff = Column(Numeric, default=0)
     total_score_sum = Column(Numeric, default=0)
     cosine_similarity_sum = Column(Numeric, default=0)
     total_score_size = Column(Numeric, default=0)
     cosine_similarity_size = Column(Numeric, default=0)
     fehner_type = Column(String)
     is_propaganda = Column(Boolean)
+    hash = Column(String)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -75,6 +75,9 @@ class NoteDao(BaseDao):
 
     def get_by_id(self, record_id):
         return super().get_by_id(Note, record_id)
+
+    def get_by_hash(self, hash):
+        return self.session.query(Note).filter_by(hash=hash).first()
 
     def get_by_source_id(self, source_id):
         return self.session.query(Note).filter_by(source_id=source_id).all()
@@ -138,7 +141,7 @@ class SourceDao(BaseDao):
         for model_to_save in models_to_save:
             model_from_db = self.get_by_id(model_to_save.id)
             if (model_from_db == None):
-                self.session.add_all(models_to_save)
+                self.session.add(model_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
 
@@ -172,11 +175,24 @@ class Migration:
             Source(id=20, name='20', external_id="20", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
             Source(id=21, name='21', external_id="21", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
             Source(id=22, name='22', external_id="22", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
-            Source(id=23, name='CNN NEWS', external_id="23", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=24, name='FOX NEWS', external_id="24", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=25, name='NY NEWS', external_id="25", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=26, name='THE GUARDIAN NEWS', external_id="26", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=27, name='SUN NEWS', external_id="27", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=23, name='23', external_id="23", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=24, name='24', external_id="24", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=25, name='25', external_id="25", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=26, name='26', external_id="26", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=27, name='27', external_id="27", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=28, name='28', external_id="28", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=29, name='29', external_id="29", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=30, name='30', external_id="30", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=31, name='31', external_id="31", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=32, name='32', external_id="32", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=33, name='33', external_id="33", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=34, name='34', external_id="34", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=35, name='35', external_id="35", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=36, name='CNN NEWS', external_id="23", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=37, name='FOX NEWS', external_id="24", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=38, name='NY NEWS', external_id="25", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=39, name='THE GUARDIAN NEWS', external_id="26", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=40, name='SUN NEWS', external_id="27", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
         ]
         source_dao.save(*initial_sources)
 
