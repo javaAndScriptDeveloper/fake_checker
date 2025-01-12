@@ -9,12 +9,3 @@ services:
     environment:
       POSTGRES_PASSWORD: password
       POSTGRESQL_DATABASE: fake_checker
-
-  fake-checker-test:
-    image: bitnami/postgresql:latest
-    container_name: fake-checker-test
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_PASSWORD: password
-      POSTGRESQL_DATABASE: fake_checker

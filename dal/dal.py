@@ -1,7 +1,9 @@
 from automapper import mapper
 from sqlalchemy import (Column, DateTime, ForeignKey, Integer, MetaData,
-                        Numeric, String, Text, create_engine, func, text)
+                        Numeric, String, Text, create_engine, func, text, Boolean)
 from sqlalchemy.orm import DeclarativeBase, Session
+
+from enums import PLATFORM_TYPE
 
 engine = create_engine('postgresql://postgres:password@localhost:5432/fake_checker')
 
@@ -19,28 +21,23 @@ class Source(Base):
     platform = Column(String, nullable=False)
     name = Column(String, nullable=False)
     rating = Column(Numeric, nullable=True)
-
-    def __str__(self) -> str:
-        return f'id: {self.id},\n' \
-            + f'platform: {self.platform},\n' \
-            + f'name: {self.name},\n' \
-            + f'rating: {self.rating},\n'
+    is_hidden = Column(Boolean, nullable=True)
 
 
 class Note(Base):
     __tablename__ = "notes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     content = Column(String, nullable=False)
-    sentimental_score = Column(Numeric, default=0) # x2
-    triggered_keywords = Column(Numeric, default=0) # x
-    triggered_topics = Column(Numeric, default=0) # x7
-    text_simplicity_deviation = Column(Numeric, default=0) # x5
-    confidence_factor = Column(Numeric, default=100) # x6
-    clickbait = Column(Numeric, default=0) # x10
-    subjective = Column(Numeric, default=0) # x1
-    call_to_action = Column(Numeric, default=0) # x8
-    repeated_take = Column(Numeric, default=0) # x3
-    repeated_note = Column(Numeric, default=0) # x4
+    sentimental_score = Column(Numeric, default=0)  # x2
+    triggered_keywords = Column(Numeric, default=0)  # x
+    triggered_topics = Column(Numeric, default=0)  # x7
+    text_simplicity_deviation = Column(Numeric, default=0)  # x5
+    confidence_factor = Column(Numeric, default=100)  # x6
+    clickbait = Column(Numeric, default=0)  # x10
+    subjective = Column(Numeric, default=0)  # x1
+    call_to_action = Column(Numeric, default=0)  # x8
+    repeated_take = Column(Numeric, default=0)  # x3
+    repeated_note = Column(Numeric, default=0)  # x4
     total_score = Column(Numeric, default=50)
     cosine_similarity = Column(Numeric, default=0)
     fehner_coeff = Column(Numeric, default=0)
@@ -49,24 +46,14 @@ class Note(Base):
     total_score_size = Column(Numeric, default=0)
     cosine_similarity_size = Column(Numeric, default=0)
     fehner_type = Column(String)
+    is_propaganda = Column(Boolean)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
-    def __str__(self) -> str:
-        return f'sentimental_score: {int(self.sentimental_score * 100)}%,\n' \
-            + f'triggered_keywords: {self.triggered_keywords}%,\n' \
-            + f'triggered_topics: {int(self.triggered_topics)}%,\n' \
-            + f'text_simplicity_deviation: {int(self.text_simplicity_deviation)}%,\n' \
-            + f'confidence_factor: {int(self.confidence_factor)}%,\n' \
-            + f'clickbait: {int(self.clickbait)}%,\n' \
-            + f'subjective: {int(self.subjective)}%,\n' \
-            + f'call_to_action: {int(self.call_to_action)}%,\n' \
-            + f'repeated_take: {int(self.repeated_take)}%,\n' \
-            + f'repeated_note: {int(self.repeated_note)}%,\n' \
-            + f'total_score: {int(self.total_score)}%,\n'
 
 Base.metadata.create_all(engine)
+
 
 class BaseDao:
 
@@ -120,7 +107,6 @@ class NoteDao(BaseDao):
         )
 
 
-
 class SourceDao(BaseDao):
 
     def get_all(self):
@@ -155,3 +141,44 @@ class SourceDao(BaseDao):
                 self.session.add_all(models_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
+
+class Migration:
+
+    def __init__(self, note_dao: NoteDao, source_dao: SourceDao):
+        self.note_dao = note_dao
+        self.source_dao = source_dao
+
+    def save_initial_sources(self, source_dao: SourceDao):
+        initial_sources = [
+            Source(id=1, name='1', external_id="1", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=2, name='2', external_id="2", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=3, name='3', external_id="3", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=4, name='4', external_id="4", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=5, name='5', external_id="5", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=6, name='6', external_id="6", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=7, name='7', external_id="7", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=8, name='8', external_id="8", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=9, name='9', external_id="9", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=10, name='10', external_id="10", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=11, name='11', external_id="11", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=12, name='12', external_id="12", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=13, name='13', external_id="13", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=14, name='14', external_id="14", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=15, name='15', external_id="15", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=16, name='16', external_id="16", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=17, name='17', external_id="17", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=18, name='18', external_id="18", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=19, name='19', external_id="19", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=20, name='20', external_id="20", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=21, name='21', external_id="21", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=22, name='22', external_id="22", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
+            Source(id=23, name='CNN NEWS', external_id="23", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=24, name='FOX NEWS', external_id="24", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=25, name='NY NEWS', external_id="25", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=26, name='THE GUARDIAN NEWS', external_id="26", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=27, name='SUN NEWS', external_id="27", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+        ]
+        source_dao.save(*initial_sources)
+
+    def execute(self):
+        self.save_initial_sources(self.source_dao)
