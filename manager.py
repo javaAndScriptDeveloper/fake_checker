@@ -27,7 +27,7 @@ class Manager:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('content'), data.get('source_id'))
+                    self.process(data.get('title'), data.get('content'), data.get('source_id'))
 
                     print(f"Processed coldstart file: {filename}")
             except Exception as e:
@@ -39,19 +39,19 @@ class Manager:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('content'), data.get('source_id'))
+                    self.process(data.get('title'), data.get('content'), data.get('source_id'))
 
                     print(f"Processed initial file: {filename}")
             except Exception as e:
                 print(f"Error reading {filename}: {e}")
 
-    def process(self, text, source_id):
+    def process(self, title,  text, source_id):
         hash = self._resolve_text_hash(text)
         text_by_hash = self.note_dao.get_by_hash(hash)
         if text_by_hash is not None:
             print(f"Skipped processing already processed text: {text[:16]}...")
             return text_by_hash
-        evaluation_context = self.evaluation_processor.evaluate(text, source_id)
+        evaluation_context = self.evaluation_processor.evaluate(title, text, source_id)
         note = Note()
         note = self._mapEvaluationContext(evaluation_context, note)
         self.fehner_processor.process(text, note)
@@ -65,16 +65,47 @@ class Manager:
     def _mapEvaluationContext(self, evaluationContext: EvaluationContext, note: Note):
         note.content = evaluationContext.data
         note.source_id = evaluationContext.source_id
+
         note.sentimental_score = evaluationContext.sentimental_analysis_result
+        note.sentimental_score_raw = evaluationContext.sentimental_analysis_raw_result
+        note.sentimental_score_coeff = evaluationContext.sentimental_analysis_coeff
+
         note.triggered_keywords = evaluationContext.trigger_keywords_result
+        note.triggered_keywords_raw = evaluationContext.trigger_keywords_raw_result
+        note.triggered_keywords_coeff = evaluationContext.trigger_keywords_coeff
+
         note.text_simplicity_deviation = evaluationContext.text_simplicity_deviation
+        note.text_simplicity_deviation_raw = evaluationContext.text_simplicity_deviation_raw_result
+        note.text_simplicity_deviation_coeff = evaluationContext.text_simplicity_deviation_coeff
+
         note.confidence_factor = evaluationContext.confidence_factor
+        note.confidence_factor_raw = evaluationContext.confidence_factor_raw_result
+        note.confidence_factor_coeff = evaluationContext.confidence_factor_coeff
+
         note.triggered_topics = evaluationContext.trigger_topics_result
+        note.triggered_topics_raw = evaluationContext.trigger_topics_raw_result
+        note.triggered_topics_coeff = evaluationContext.trigger_topics_coeff
+
         note.clickbait = evaluationContext.clickbait_result
+        note.clickbait_raw = evaluationContext.clickbait_raw_result
+        note.clickbait_coeff = evaluationContext.clickbait_coeff
+
         note.subjective = evaluationContext.subjective_result
+        note.subjective_raw = evaluationContext.subjective_raw_result
+        note.subjective_coeff = evaluationContext.subjective_coeff
+
         note.call_to_action = evaluationContext.call_to_action_result
+        note.call_to_action_raw = evaluationContext.call_to_action_raw_result
+        note.call_to_action_coeff = evaluationContext.call_to_action_coeff
+
         note.repeated_take = evaluationContext.repeated_take_result
+        note.repeated_take_raw = evaluationContext.repeated_take_raw_result
+        note.repeated_take_coeff = evaluationContext.repeated_take_coeff
+
         note.repeated_note = evaluationContext.repeated_note_result
+        note.repeated_note_raw = evaluationContext.repeated_note_raw_result
+        note.repeated_note_coeff = evaluationContext.repeated_note_coeff
+
         note.total_score = evaluationContext.total_score
         note.is_propaganda = evaluationContext.is_propaganda
         return note

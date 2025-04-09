@@ -167,7 +167,7 @@ class AppDemo(QWidget):
         input_text = self.text_input.toPlainText()
 
         # Call the processing function
-        note = self.manager.process(input_text, source_id)
+        note = self.manager.process(None, input_text, source_id)
 
         result_text = f"""
             Sentimental Score: {note.sentimental_score}%<br>
@@ -228,4 +228,4 @@ class AppDemo(QWidget):
         self.sort_table_by_rating()
 
     def sort_table_by_rating(self):
-        self.ratings_table.sortItems(1, order=0)  # Sort by rating (ascending)
+        self.ratings_table.sortItems(1, order=0)

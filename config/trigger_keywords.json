@@ -1,6 +1,29 @@
 {
   "language" : {
     "russian": ["специальной военной операции", "криптобандеровцы", "ЦИПСО"],
-    "english": ["NATO", "borders", "war", "Cold War"]
-  }
+"english": [
+    "NATO", "borders", "war", "Cold War", "imperialism", "sovereignty", "occupation",
+    "annexation", "regime change", "proxy war", "sanctions", "propaganda", "censorship",
+    "disinformation", "fake news", "geopolitics", "militarization", "invasion",
+    "genocide", "resistance", "insurgency", "terrorism", "freedom fighters", "rebels",
+    "separatists", "autonomy", "nationalism", "patriotism", "revolution", "coup",
+    "nuclear weapons", "arms race", "espionage", "intelligence", "deep state",
+    "globalists", "hegemony", "puppet government", "colonialism", "independence",
+    "color revolution", "intervention", "sovereign nation", "economic warfare",
+    "trade war", "sanctioned", "allies", "axis of evil", "military-industrial complex",
+    "asymmetric warfare", "psychological warfare", "hybrid war", "media manipulation",
+    "Western agenda", "Eastern bloc", "fifth column", "brainwashing", "cyber warfare",
+    "biological warfare", "chemical weapons", "deterrence", "containment",
+    "strategic interests", "foreign influence", "national security", "classified",
+    "whistleblower", "false flag", "deep cover", "covert operations", "war crimes",
+    "human rights violations", "political prisoners", "authoritarianism",
+    "dictatorship", "totalitarianism", "martial law", "economic sanctions",
+    "forced migration", "refugee crisis", "border security", "patriotic duty",
+    "traitor", "defector", "civil unrest", "cultural infiltration", "media blackout",
+    "state-controlled media", "fake democracy", "foreign meddling", "espionage act",
+    "strategic alliance", "state-sponsored", "black ops", "political asylum",
+    "mass surveillance", "secret police", "thought control", "national unity",
+    "counterintelligence", "information war", "reeducation", "psychological operations",
+    "military occupation"
+  ]  }
 }

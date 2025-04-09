@@ -38,12 +38,12 @@ class FehnerProcessor:
    def process(self, text, note):
 
        cosine_similarity = self.calculate_similarity_score(text)
-       note.cosine_similarity = cosine_similarity
+       note.cosine_similarity = float(cosine_similarity)
        last_note = self.note_dao.get_last_note()
 
        if not last_note:
            note.cosine_similarity_sum = note.cosine_similarity
-           note.cosine_similarity_size = 1
+           note.cosine_similarity_size = int(1)
            note.total_score_sum = note.total_score
            note.total_score_size = 1
            return

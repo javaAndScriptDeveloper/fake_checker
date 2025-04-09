@@ -28,28 +28,106 @@ class Note(Base):
     __tablename__ = "notes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     content = Column(String, nullable=False)
+
+    sentimental_score_coeff = Column(Numeric, default=0)
+    sentimental_score_raw = Column(Numeric, default=0)
     sentimental_score = Column(Numeric, default=0)  # x2
+
+    triggered_keywords_coeff = Column(Numeric, default=0)
+    triggered_keywords_raw = Column(Numeric, default=0)
     triggered_keywords = Column(Numeric, default=0)  # x
+
+    triggered_topics_coeff = Column(Numeric, default=0)
+    triggered_topics_raw = Column(Numeric, default=0)
     triggered_topics = Column(Numeric, default=0)  # x7
+
+    text_simplicity_deviation_coeff = Column(Numeric, default=0)
+    text_simplicity_deviation_raw = Column(Numeric, default=0)
     text_simplicity_deviation = Column(Numeric, default=0)  # x5
+
+    confidence_factor_coeff = Column(Numeric, default=0)
+    confidence_factor_raw = Column(Numeric, default=0)
     confidence_factor = Column(Numeric, default=100)  # x6
+
+    clickbait_coeff = Column(Numeric, default=0)
+    clickbait_raw = Column(Numeric, default=0)
     clickbait = Column(Numeric, default=0)  # x10
+
+    subjective_coeff = Column(Numeric, default=0)
+    subjective_raw = Column(Numeric, default=0)
     subjective = Column(Numeric, default=0)  # x1
+
+    call_to_action_coeff = Column(Numeric, default=0)
+    call_to_action_raw = Column(Numeric, default=0)
     call_to_action = Column(Numeric, default=0)  # x8
+
+    repeated_take_coeff = Column(Numeric, default=0)
+    repeated_take_raw = Column(Numeric, default=0)
     repeated_take = Column(Numeric, default=0)  # x3
+
+    repeated_note_coeff = Column(Numeric, default=0)
+    repeated_note_raw = Column(Numeric, default=0)
     repeated_note = Column(Numeric, default=0)  # x4
+
+    total_score_coeff = Column(Numeric, default=0)
+    total_score_raw = Column(Numeric, default=0)
     total_score = Column(Numeric, default=50)
+
+    cosine_similarity_coeff = Column(Numeric, default=0)
+    cosine_similarity_raw = Column(Numeric, default=0)
     cosine_similarity = Column(Numeric, default=0)
+
     total_score_sum = Column(Numeric, default=0)
     cosine_similarity_sum = Column(Numeric, default=0)
     total_score_size = Column(Numeric, default=0)
     cosine_similarity_size = Column(Numeric, default=0)
+
     fehner_type = Column(String)
     is_propaganda = Column(Boolean)
     hash = Column(String)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    @classmethod
+    def get_all_sentimental_scores(cls):
+        return [row[0] for row in session.query(cls.sentimental_score).all()]
+
+    @classmethod
+    def get_all_triggered_keywords(cls):
+        return [row[0] for row in session.query(cls.triggered_keywords).all()]
+
+    @classmethod
+    def get_all_triggered_topics(cls):
+        return [row[0] for row in session.query(cls.triggered_topics).all()]
+
+    @classmethod
+    def get_all_text_simplicity_deviations(cls):
+        return [row[0] for row in session.query(cls.text_simplicity_deviation).all()]
+
+    @classmethod
+    def get_all_confidence_factors(cls):
+        return [row[0] for row in session.query(cls.confidence_factor).all()]
+
+    @classmethod
+    def get_all_clickbait_scores(cls):
+        return [row[0] for row in session.query(cls.clickbait).all()]
+
+    @classmethod
+    def get_all_subjectivity_scores(cls):
+        return [row[0] for row in session.query(cls.subjective).all()]
+
+    @classmethod
+    def get_all_call_to_action_scores(cls):
+        return [row[0] for row in session.query(cls.call_to_action).all()]
+
+    @classmethod
+    def get_all_repeated_takes(cls):
+        return [row[0] for row in session.query(cls.repeated_take).all()]
+
+    @classmethod
+    def get_all_repeated_notes(cls):
+        return [row[0] for row in session.query(cls.repeated_note).all()]
 
 
 Base.metadata.create_all(engine)
@@ -82,12 +160,16 @@ class NoteDao(BaseDao):
     def get_by_source_id(self, source_id):
         return self.session.query(Note).filter_by(source_id=source_id).all()
 
-    def get_average_rating(self):
+    def get_upper_third_rating(self):
         notes = self.session.query(Note).all()
         if not notes:
             return 100
-        total_scores = [note.total_score for note in notes]
-        return sum(total_scores) / len(total_scores)
+
+        total_scores = sorted([note.total_score for note in notes], reverse=True)
+        upper_third_index = max(1, len(total_scores) // 3)  # At least one value in the upper third
+        upper_third_scores = total_scores[upper_third_index:]
+
+        return sum(upper_third_scores) / len(upper_third_scores)
 
     def update(self, model_to_update):
         model_from_db = self.get_by_id(model_to_update.__class__, model_to_update.id)

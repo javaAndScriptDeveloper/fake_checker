@@ -14,3 +14,4 @@ scikit-learn
 black
 isort
 flake8
+py-automapper
