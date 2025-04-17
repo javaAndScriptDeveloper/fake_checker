@@ -1,0 +1,5 @@
+{
+  "url": "https://x.com/iamsaquibdev/status/1909649748149387539",
+  "title": "What are Sockets in Java?",
+  "content": "What are Sockets in Java?\n\nA socket is an endpoint for communication between two machines. Java provides the java .net package, which contains classes for implementing network communication using sockets. \n\nSockets can be used for both client-server communication and peer-to-peer communication.\n\nTypes of Sockets:\n- TCP Sockets: Reliable, connection-oriented communication using socket and ServerSocket classes.\n- UDP Sockets: Unreliable, connectionless communication using DatagramSocket and DatagramPacket classes."
+}

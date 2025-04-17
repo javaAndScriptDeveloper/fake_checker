@@ -182,7 +182,7 @@ class ClickBait(Evaluation):
             evaluation_context.clickbait_result = 0
             return
         start_time = time.perf_counter()
-        evaluation_context.clickbait_result = float(is_clickbait(evaluation_context.title)[0]) * 100
+        evaluation_context.clickbait_result = float(is_clickbait(evaluation_context.title)[0])
         evaluation_context.clickbait_raw_result = evaluation_context.clickbait_result
         end_time = time.perf_counter()
         evaluation_context.clickbait_execution_time = end_time - start_time
@@ -227,39 +227,36 @@ class ConfidenceFactor(Evaluation):
 
 class CallToAction(Evaluation):
 
-    def parse_config(self):
-        with open('/home/vampir/lolitech/dissertation/config/call_to_action_keywords.json', 'r', encoding='utf-8') as file:
-            data = json.load(file)
-        return data.get("keywords", [])
+    def __init__(self):
+        super().__init__()
+        self.cta_keywords = self.load_cta_keywords()
 
-    def is_call_to_action(self, sentence: str) -> bool:
-        doc = nlp(sentence)
-        cta_keywords = self.parse_config()
-        for token in doc:
-            if token.lemma_.lower() in cta_keywords:
-                return True
-        return False
+    def load_cta_keywords(self):
+        try:
+            with open('/home/vampir/lolitech/dissertation/config/call_to_action_keywords.json', 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                return set(keyword.lower() for keyword in data.get("keywords", []))
+        except Exception as e:
+            print(f"[ERROR] Failed to load call-to-action keywords: {e}")
+            return set()
+
+    def is_call_to_action_token(self, token) -> bool:
+        return token.pos_ == "VERB" and token.lemma_.lower() in self.cta_keywords
 
     def evaluate(self, evaluation_context: EvaluationContext):
         start_time = time.perf_counter()
 
         text = evaluation_context.data
-
         doc = nlp(text)
-        sentences = list(doc.sents)
 
-        if sentences:
-            cta_counts = sum(1 for sentence in sentences if self.is_call_to_action(sentence.text))
-            total_sentences = len(sentences)
+        # Count matching CTA verbs
+        cta_count = sum(1 for token in doc if self.is_call_to_action_token(token))
+        total_verbs = sum(1 for token in doc if token.pos_ == "VERB")
 
-            evaluation_context.call_to_action_result = cta_counts / total_sentences
-        else:
-            evaluation_context.call_to_action_result = 0
-
+        # Compute ratio
+        evaluation_context.call_to_action_result = (cta_count / total_verbs) if total_verbs else 0.0
         evaluation_context.call_to_action_raw_result = evaluation_context.call_to_action_result
-        end_time = time.perf_counter()
-        evaluation_context.evaluation_execution_time = end_time - start_time
-
+        evaluation_context.evaluation_execution_time = time.perf_counter() - start_time
 
 class RepeatedNote(Evaluation):
 
@@ -329,7 +326,7 @@ class RepeatedTake(Evaluation):
         # Check for repeated sentences
         repeated_sentence_indices = self.find_repeated_sentences(sentences)
 
-        evaluation_context.repeated_take_result = len(repeated_sentence_indices) / len(sentences)
+        evaluation_context.repeated_take_result = 1 if repeated_sentence_indices else 0
         evaluation_context.repeated_take_raw_result = evaluation_context.repeated_take_result
 
         end_time = time.perf_counter()
@@ -426,7 +423,6 @@ class EvaluationProcessor:
                       + context.repeated_take_result \
                       + context.repeated_note_result \
                       + context.confidence_factor)
-        #context.is_propaganda = context.total_score > self.note_dao.get_upper_third_rating()
         context.is_propaganda = context.total_score > 0.3
         return context
 
