@@ -5,6 +5,8 @@ import os
 from dal.dal import Note, NoteDao, SourceDao
 from processors.evaluation_processor import EvaluationContext, EvaluationProcessor
 from processors.fehner_processor import FehnerProcessor
+from translation import Translator
+
 
 class Manager:
 
@@ -12,11 +14,13 @@ class Manager:
                  evaluation_processor: EvaluationProcessor,
                  note_dao: NoteDao,
                  source_dao: SourceDao,
-                 fehner_processor: FehnerProcessor):
+                 fehner_processor: FehnerProcessor,
+                 translator: Translator):
         self.evaluation_processor = evaluation_processor
         self.note_dao = note_dao
         self.source_dao = source_dao
         self.fehner_processor = fehner_processor
+        self.translator = translator
 
         self.coldstart("/home/vampir/lolitech/dissertation/data/coldstart")
         self.process_initial("/home/vampir/lolitech/dissertation/data/initial")
@@ -27,7 +31,7 @@ class Manager:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('title'), data.get('content'), data.get('source_id'))
+                    self.process(data.get('title'), data.get('content'), data.get('source_id'), data.get('language'))
 
                     print(f"Processed coldstart file: {filename}")
             except Exception as e:
@@ -39,18 +43,21 @@ class Manager:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('title'), data.get('content'), data.get('source_id'))
+                    self.process(data.get('title'), data.get('content'), data.get('source_id'), data.get('language'))
 
                     print(f"Processed initial file: {filename}")
             except Exception as e:
                 print(f"Error reading {filename}: {e}")
 
-    def process(self, title,  text, source_id):
+    def process(self, title,  text, source_id, language):
         hash = self._resolve_text_hash(text)
         text_by_hash = self.note_dao.get_by_hash(hash)
         if text_by_hash is not None:
             print(f"Skipped processing already processed text: {text[:16]}...")
             return text_by_hash
+        if (language != "english"):
+            title = self.translator.translate_to_english(title, language)
+            text = self.translator.translate_to_english(text, language)
         evaluation_context = self.evaluation_processor.evaluate(title, text, source_id)
         note = Note()
         note = self._mapEvaluationContext(evaluation_context, note)
@@ -128,3 +135,6 @@ class Manager:
 
     def calculate_fehner_score(self):
         return self.fehner_processor.calculate_fehner_score()
+
+    def get_available_translations(self):
+        return self.translator.supported_translations_list

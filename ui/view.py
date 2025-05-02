@@ -5,8 +5,10 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QComboBox, QTextEdit, QPushButton, QLabel,
     QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView
 )
+from PyQt5 import QtGui
 
 from manager import Manager
+from singletons import manager
 
 
 class AppDemo(QWidget):
@@ -40,6 +42,12 @@ class AppDemo(QWidget):
 
         self.setLayout(self.layout)
 
+        self.total_score_color_dict = [
+            {'range': (0.51, 1), 'color': QtGui.QColor(255, 102, 102)}, # red
+            {'range': (0.31, 0.5), 'color': QtGui.QColor(255, 255, 102)}, # yellow
+            {'range': (0, 0.3), 'color': QtGui.QColor(144, 238, 144)} # green
+        ]
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_ratings)
         self.timer.start(5000)
@@ -51,6 +59,13 @@ class AppDemo(QWidget):
         self.label = QLabel('Select Source:')
         dropdown_layout.addWidget(self.label)
 
+        self.language_dropdown = QComboBox()
+        for language in self.manager.get_available_translations():
+            self.language_dropdown.addItem(language['label'], language['value'])
+        self.language_dropdown.setCurrentIndex(0)
+        dropdown_layout.addWidget(QLabel("Select Language:"))
+        dropdown_layout.addWidget(self.language_dropdown)
+
         self.dropdown = QComboBox()
         for source in self.sources:
             self.dropdown.addItem(f'{source.name} ({source.platform})', source.id)
@@ -58,7 +73,6 @@ class AppDemo(QWidget):
 
         process_layout.addLayout(dropdown_layout)
 
-        # Title input
         self.title_input = QTextEdit()
         self.title_input.setPlaceholderText("Enter title here...")
         self.title_input.setFixedWidth(400)
@@ -69,8 +83,8 @@ class AppDemo(QWidget):
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText("Enter your text here...")
         self.text_input.setFixedWidth(400)
-        self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
         self.text_input.setFixedHeight(100)
+        self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
         process_layout.addWidget(self.text_input)
 
         self.process_button = QPushButton('Process')
@@ -134,8 +148,9 @@ class AppDemo(QWidget):
         source_id = self.dropdown.currentData()
         title = self.title_input.toPlainText()
         input_text = self.text_input.toPlainText()
+        language = self.language_dropdown.currentData()
 
-        note = self.manager.process(title, input_text, source_id)
+        note = self.manager.process(title, input_text, source_id, language)
 
         result_text = f"""
             Sentimental Score: {note.sentimental_score}%<br>
@@ -158,8 +173,9 @@ class AppDemo(QWidget):
         row_position = self.result_table.rowCount()
         self.result_table.insertRow(row_position)
 
-        color_item = QTableWidgetItem()
-        self.result_table.setItem(row_position, 0, color_item)
+        source = next((s for s in self.sources if s.id == note.source_id), None)
+
+        self.result_table.setItem(row_position, 0, QTableWidgetItem(source.name))
         self.result_table.setItem(row_position, 1, QTableWidgetItem(text_data))
         self.result_table.setItem(row_position, 2, QTableWidgetItem(f"{note.sentimental_score}%"))
         self.result_table.setItem(row_position, 3, QTableWidgetItem(f"{note.triggered_keywords}%"))
@@ -171,8 +187,19 @@ class AppDemo(QWidget):
         self.result_table.setItem(row_position, 9, QTableWidgetItem(f"{note.call_to_action}%"))
         self.result_table.setItem(row_position, 10, QTableWidgetItem(f"{note.repeated_take}%"))
         self.result_table.setItem(row_position, 11, QTableWidgetItem(f"{note.repeated_note}%"))
-        self.result_table.setItem(row_position, 12, QTableWidgetItem(f"{note.total_score}%"))
+
+        total_score_item = QTableWidgetItem(f"{note.total_score}%")
+        self.apply_color_to_score(total_score_item, note.total_score)
+        self.result_table.setItem(row_position, 12, total_score_item)
+
         self.result_table.setItem(row_position, 13, QTableWidgetItem(f"{note.is_propaganda}%"))
+
+    def apply_color_to_score(self, item, score):
+        for i in self.total_score_color_dict:
+            lower, upper = i['range']
+            if lower < score < upper:
+                item.setBackground(i['color'])
+                break
 
     def update_ratings(self):
         data = self.manager.get_sources_with_ratings()
