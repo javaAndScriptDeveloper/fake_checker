@@ -25,27 +25,13 @@ def process_file(path):
     content = file.get("content", "")
     print(manager.process(title, content, source_id, "english"))
 
-process_file("data/examples/putin_speech.json")
-process_file("data/examples/sockets.json")
-process_file("data/examples/tucker_carlson.json")
-process_file("data/examples/trump_on_economics.json")
-process_file("data/examples/magic_of_math.json")
-process_file("data/examples/space_x.json")
-process_file("data/examples/nets_shorthanded_again.json")
-process_file("data/examples/trump_liz_truss_moment.json")
-process_file("data/examples/the_pitt_tv_show_at_the_moment.json")
-process_file("data/examples/trump_harris_debates.json")
-
 process_file("data/examples/putin_address_to_general_assambly.json")
-process_file("data/examples/putin_start_of_invasion.json")
-
+process_file("data/examples/macron_vision.json")
 process_file("data/examples/trump_tulsa.json")
 process_file("data/examples/trump_we_will_never_give_up.json")
-
 process_file("data/examples/hitler_proclamation_to_german_nation.json")
 process_file("data/examples/hitler_sportpalats_speech.json")
-
-process_file("data/examples/indian_art.json")
 process_file("data/examples/linear_geometry.json")
+process_file("data/examples/magic_of_math.json")
 process_file("data/examples/ocean_investigations.json")
 process_file("data/examples/farming_apples.json")

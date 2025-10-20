@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QComboBox, QTextEdit, QPushButton, QLabel,
-    QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView
+    QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSpacerItem, QSizePolicy
 )
 from PyQt5 import QtGui
 
@@ -100,6 +100,7 @@ class AppDemo(QWidget):
 
     def init_table_tab(self):
         table_layout = QVBoxLayout()
+
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(14)
         self.result_table.setHorizontalHeaderLabels([
@@ -110,7 +111,19 @@ class AppDemo(QWidget):
         ])
         header = self.result_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
+
         table_layout.addWidget(self.result_table)
+
+        # Export Button in bottom right
+        button_layout = QHBoxLayout()
+        button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        export_button = QPushButton("Export to CSV")
+        export_button.clicked.connect(self.export_to_csv)
+        button_layout.addWidget(export_button)
+
+        table_layout.addLayout(button_layout)
+
         self.tab_table.setLayout(table_layout)
 
     def init_ratings_tab(self):
@@ -213,3 +226,22 @@ class AppDemo(QWidget):
 
     def sort_table_by_rating(self):
         self.ratings_table.sortItems(1, order=0)
+
+    def export_to_csv(self):
+        data = []
+        row_count = self.result_table.rowCount()
+        col_count = self.result_table.columnCount()
+        headers = [self.result_table.horizontalHeaderItem(i).text() for i in range(col_count)]
+        data.append(headers)
+
+        for row in range(row_count):
+            row_data = []
+            for col in range(col_count):
+                item = self.result_table.item(row, col)
+                row_data.append(item.text() if item else "")
+            data.append(row_data)
+
+        try:
+            self.manager.export_results_to_csv(data)
+        except Exception as e:
+            print(f"CSV export failed: {e}")

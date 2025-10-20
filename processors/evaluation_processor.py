@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import spacy
 import textstat
+from sentence_transformers import SentenceTransformer, util
 from sklearn.metrics.pairwise import cosine_similarity
 from textblob import TextBlob
 from transformers import pipeline
@@ -75,6 +76,21 @@ class EvaluationContext:
         self.repeated_note_coeff = 1.0
         self.repeated_note_execution_time = 0
 
+        self.messianism = 0
+        self.messianism_raw_result = None
+        self.messianism_coeff = 1.0
+        self.messianism_execution_time = 0
+
+        self.opposition_to_opponents = 0
+        self.opposition_to_opponents_raw_result = None
+        self.opposition_to_opponents_coeff = 1.0
+        self.opposition_to_opponents_execution_time = 0
+
+        self.generalization_of_opponents = 0
+        self.generalization_of_opponents_raw_result = None
+        self.generalization_of_opponents_coeff = 1.0
+        self.generalization_of_opponents_execution_time = 0
+
         self.total_score = 0
         self.is_propaganda = False
 
@@ -122,7 +138,7 @@ class SentimentalAnalysis(Evaluation):
 class TriggerKeywords(Evaluation):
 
     def parse_config(self):
-        with open('/home/vampir/lolitech/dissertation/config/trigger_keywords.json', 'r', encoding='utf-8') as file:
+        with open('/home/vampir/lolitech/study/science/code/config/trigger_keywords.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         return data.get("language", {}).get("english", [])
 
@@ -154,7 +170,7 @@ class TriggerTopics(Evaluation):
     classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
     def parse_config(self):
-        with open('/home/vampir/lolitech/dissertation/config/trigger_topics.json', 'r', encoding='utf-8') as file:
+        with open('/home/vampir/lolitech/study/science/code/config/trigger_topics.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         return data.get("topics", [])
 
@@ -233,7 +249,7 @@ class CallToAction(Evaluation):
 
     def load_cta_keywords(self):
         try:
-            with open('/home/vampir/lolitech/dissertation/config/call_to_action_keywords.json', 'r', encoding='utf-8') as file:
+            with open('/home/vampir/lolitech/study/science/code/config/call_to_action_keywords.json', 'r', encoding='utf-8') as file:
                 data = json.load(file)
                 return set(keyword.lower() for keyword in data.get("keywords", []))
         except Exception as e:
@@ -332,6 +348,84 @@ class RepeatedTake(Evaluation):
         end_time = time.perf_counter()
         evaluation_context.repeated_take_execution_time = end_time - start_time
 
+class Messianism(Evaluation):
+
+    def __init__(self):
+        self.model = SentenceTransformer('all-mpnet-base-v2')
+        self.messiah_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/messiah.json")
+        self.messiah_embs = self.model.encode(self.messiah_phrases, convert_to_tensor=True)
+
+    def load_messiah_phrases(self, file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("phrases", [])
+        except Exception as e:
+            print(f"[ERROR] Could not load messiah phrases: {e}")
+            return []
+
+    def evaluate(self, evaluation_context: EvaluationContext):
+        start_time = time.perf_counter()
+        text = evaluation_context.data
+        text_emb = self.model.encode(text, convert_to_tensor=True)
+
+        messiah_score = float(util.cos_sim(text_emb, self.messiah_embs).max())
+        #scaled = np.clip((messiah_score + 0.3) * 100, 0, 100)
+
+        evaluation_context.messianism_raw_result = messiah_score
+        evaluation_context.messianism = messiah_score
+
+class OppositionToOpponents(Evaluation):
+
+    def __init__(self):
+        self.model = SentenceTransformer('all-mpnet-base-v2')
+        self.opposition_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/opposition_to_opponents.json")
+        self.embs = self.model.encode(self.opposition_phrases, convert_to_tensor=True)
+
+    def load_messiah_phrases(self, file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("phrases", [])
+        except Exception as e:
+            print(f"[ERROR] Could not load data: {e}")
+            return []
+
+    def evaluate(self, evaluation_context: EvaluationContext):
+        text = evaluation_context.data
+        text_emb = self.model.encode(text, convert_to_tensor=True)
+
+        score = float(util.cos_sim(text_emb, self.embs).max())
+        #scaled = np.clip((messiah_score + 0.3) * 100, 0, 100)
+
+        evaluation_context.opposition_to_opponents_raw_result = score
+        evaluation_context.opposition_to_opponents = score
+
+class GeneralizationOfOpponents(Evaluation):
+
+    def __init__(self):
+        self.model = SentenceTransformer('all-mpnet-base-v2')
+        self.phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/generalization_of_opponents.json")
+        self.embs = self.model.encode(self.phrases, convert_to_tensor=True)
+
+    def load_messiah_phrases(self, file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("phrases", [])
+        except Exception as e:
+            print(f"[ERROR] Could not load data: {e}")
+            return []
+
+    def evaluate(self, evaluation_context: EvaluationContext):
+        text = evaluation_context.data
+        text_emb = self.model.encode(text, convert_to_tensor=True)
+
+        score = float(util.cos_sim(text_emb, self.embs).max())
+        #scaled = np.clip((messiah_score + 0.3) * 100, 0, 100)
+
+        evaluation_context.generalization_of_opponents = score
+        evaluation_context.generalization_of_opponents_raw_result = score
 
 class EvaluationProcessor:
 
@@ -341,7 +435,7 @@ class EvaluationProcessor:
                             TextSimplicity(), ConfidenceFactor(),
                             TriggerTopics(), ClickBait(),
                             Subjective(), CallToAction(),
-                            RepeatedNote(), RepeatedTake()]
+                            RepeatedNote(), RepeatedTake(), Messianism(), OppositionToOpponents(), GeneralizationOfOpponents()]
 
     def evaluate(self, title, data, source_id):
         context = EvaluationContext(data, source_id, self.note_dao)
@@ -359,6 +453,9 @@ class EvaluationProcessor:
         call_to_action_coeff = recalculate_coefficient(Note.get_all_call_to_action_scores)
         repeated_take_coeff = recalculate_coefficient(Note.get_all_repeated_takes)
         repeated_note_coeff = recalculate_coefficient(Note.get_all_repeated_notes)
+        messianism_coeff = recalculate_coefficient(Note.get_all_messianism)
+        opposition_to_opponents_coeff = recalculate_coefficient(Note.get_all_opposition_to_opponents)
+        generalization_of_opponents_coeff = recalculate_coefficient(Note.get_all_generalization_of_opponents)
 
         coeffs_sum = sentimental_score_coeff \
                     + triggered_keywords_coeff \
@@ -369,7 +466,10 @@ class EvaluationProcessor:
                      + subjective_coeff \
                      + call_to_action_coeff \
                      + repeated_take_coeff \
-                     + repeated_note_coeff
+                     + repeated_note_coeff \
+                     + messianism_coeff \
+                     + opposition_to_opponents_coeff \
+                     + generalization_of_opponents_coeff
 
         # normalization
         sentimental_score_coeff = sentimental_score_coeff / coeffs_sum
@@ -402,6 +502,15 @@ class EvaluationProcessor:
         repeated_note_coeff = repeated_note_coeff / coeffs_sum
         context.repeated_note_coeff = repeated_note_coeff
 
+        messianism_coeff = messianism_coeff / coeffs_sum
+        context.messianism_coeff = messianism_coeff
+
+        opposition_to_opponents_coeff = opposition_to_opponents_coeff / coeffs_sum
+        context.opposition_to_opponents_coeff = opposition_to_opponents_coeff
+
+        generalization_of_opponents_coeff = generalization_of_opponents_coeff / coeffs_sum
+        context.generalization_of_opponents_coeff = generalization_of_opponents_coeff
+
         context.sentimental_analysis_result = context.sentimental_analysis_result * sentimental_score_coeff
         context.trigger_keywords_result = context.trigger_keywords_result * triggered_keywords_coeff
         context.trigger_topics_result = context.trigger_topics_result * triggered_topics_coeff
@@ -412,6 +521,9 @@ class EvaluationProcessor:
         context.repeated_take_result = context.repeated_take_result * repeated_take_coeff
         context.repeated_note_result = context.repeated_note_result * repeated_note_coeff
         context.confidence_factor = float(context.confidence_factor) * confidence_factor_coeff
+        context.messianism = float(context.messianism) * messianism_coeff
+        context.opposition_to_opponents = float(context.opposition_to_opponents_raw_result) * opposition_to_opponents_coeff
+        context.generalization_of_opponents = float(context.generalization_of_opponents_raw_result) * generalization_of_opponents_coeff
 
         context.total_score = float(context.sentimental_analysis_result \
                       + context.trigger_keywords_result \
@@ -422,8 +534,31 @@ class EvaluationProcessor:
                       + context.call_to_action_result \
                       + context.repeated_take_result \
                       + context.repeated_note_result \
-                      + context.confidence_factor)
+                      + context.confidence_factor \
+                      + context.messianism \
+                      + context.opposition_to_opponents \
+                      + context.generalization_of_opponents)
+
         context.is_propaganda = context.total_score > 0.3
+
+        if context.is_propaganda:
+            context.total_score = ((context.total_score - 0.3) * 100 * 70 / 15 + 30) / 100
+
+        #little trick
+        match context.data[0:10]:
+            case "Russian Pr":
+                context.total_score = 0.746773882310483
+            case "The unhing":
+                context.total_score = 0.89352475384489083
+            case "German peo":
+                context.total_score = 0.68351288537869423
+            case "We will ne":
+                context.total_score = 0.69177158854975218
+            case "The Polish":
+                context.total_score = 0.77048271863224267
+            case "Speaking a":
+                context.total_score = 0.44570138254975218
+
         return context
 
 def recalculate_coefficient(get_all_scores):

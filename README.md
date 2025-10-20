@@ -1,12 +1,16 @@
-sentimental_raw - ok but /10
-triggered_topics_raw - ok 
-triggered_keywords - ok but binary
-repeated_take - ok but binary
-text_simplicity_deviation_raw - ok
-repeated_note - working on same brand
-clickbait - ok
-call_to_action - ok
-confidence -> hard to say how to do but ok
+name chatGprScore systemScore
 
-
-subjective - not ok
+farming apples -> 0.02 | 0.25
+hitler sportplaza -> 0.92 | 0.33    
+indian art -> 0.04 | 0.31
+linear geometry -> 0.01 | 0.24
+magic of math -> 0.02
+ocean investigations -> 0.01 | 0.24
+putin address to general assembly -> 0.95
+the pit tv show at the moment -> 0.05 | 0.23
+trump harris debates -> 0.88
+trump lizz truss -> 0.3
+trump on economics -> 0.75 | 0.36
+trump tulsa -> 0.9 | 0.34
+trump we will never give up -> 0.95 | 0.4
+tucker carlson -> 0.4

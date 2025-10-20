@@ -69,6 +69,18 @@ class Note(Base):
     repeated_note_raw = Column(Numeric, default=0)
     repeated_note = Column(Numeric, default=0)  # x4
 
+    messianism_coeff = Column(Numeric, default=0)
+    messianism_raw = Column(Numeric, default=0)
+    messianism = Column(Numeric, default=0)
+
+    opposition_to_opponents_coeff = Column(Numeric, default=0)
+    opposition_to_opponents_raw = Column(Numeric, default=0)
+    opposition_to_opponents = Column(Numeric, default=0)
+
+    generalization_of_opponents_coeff = Column(Numeric, default=0)
+    generalization_of_opponents_raw = Column(Numeric, default=0)
+    generalization_of_opponents = Column(Numeric, default=0)
+
     total_score_coeff = Column(Numeric, default=0)
     total_score_raw = Column(Numeric, default=0)
     total_score = Column(Numeric, default=50)
@@ -129,6 +141,17 @@ class Note(Base):
     def get_all_repeated_notes(cls):
         return [row[0] for row in session.query(cls.repeated_note).all()]
 
+    @classmethod
+    def get_all_messianism(cls):
+        return [row[0] for row in session.query(cls.messianism).all()]
+
+    @classmethod
+    def get_all_opposition_to_opponents(cls):
+        return [row[0] for row in session.query(cls.opposition_to_opponents).all()]
+
+    @classmethod
+    def get_all_generalization_of_opponents(cls):
+        return [row[0] for row in session.query(cls.generalization_of_opponents).all()]
 
 Base.metadata.create_all(engine)
 
