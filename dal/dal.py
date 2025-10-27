@@ -96,6 +96,8 @@ class Note(Base):
 
     fehner_type = Column(String)
     is_propaganda = Column(Boolean)
+    reason = Column(Text, nullable=True)
+    amount_of_propaganda_scores = Column(Numeric, nullable=True)
     hash = Column(String)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
@@ -152,6 +154,59 @@ class Note(Base):
     @classmethod
     def get_all_generalization_of_opponents(cls):
         return [row[0] for row in session.query(cls.generalization_of_opponents).all()]
+
+    # Raw result methods for historical average calculation
+    @classmethod
+    def get_all_sentimental_scores_raw(cls):
+        return [row[0] for row in session.query(cls.sentimental_score_raw).all()]
+
+    @classmethod
+    def get_all_triggered_keywords_raw(cls):
+        return [row[0] for row in session.query(cls.triggered_keywords_raw).all()]
+
+    @classmethod
+    def get_all_triggered_topics_raw(cls):
+        return [row[0] for row in session.query(cls.triggered_topics_raw).all()]
+
+    @classmethod
+    def get_all_text_simplicity_deviations_raw(cls):
+        return [row[0] for row in session.query(cls.text_simplicity_deviation_raw).all()]
+
+    @classmethod
+    def get_all_confidence_factors_raw(cls):
+        return [row[0] for row in session.query(cls.confidence_factor_raw).all()]
+
+    @classmethod
+    def get_all_clickbait_scores_raw(cls):
+        return [row[0] for row in session.query(cls.clickbait_raw).all()]
+
+    @classmethod
+    def get_all_subjectivity_scores_raw(cls):
+        return [row[0] for row in session.query(cls.subjective_raw).all()]
+
+    @classmethod
+    def get_all_call_to_action_scores_raw(cls):
+        return [row[0] for row in session.query(cls.call_to_action_raw).all()]
+
+    @classmethod
+    def get_all_repeated_takes_raw(cls):
+        return [row[0] for row in session.query(cls.repeated_take_raw).all()]
+
+    @classmethod
+    def get_all_repeated_notes_raw(cls):
+        return [row[0] for row in session.query(cls.repeated_note_raw).all()]
+
+    @classmethod
+    def get_all_messianism_raw(cls):
+        return [row[0] for row in session.query(cls.messianism_raw).all()]
+
+    @classmethod
+    def get_all_opposition_to_opponents_raw(cls):
+        return [row[0] for row in session.query(cls.opposition_to_opponents_raw).all()]
+
+    @classmethod
+    def get_all_generalization_of_opponents_raw(cls):
+        return [row[0] for row in session.query(cls.generalization_of_opponents_raw).all()]
 
 Base.metadata.create_all(engine)
 
@@ -293,11 +348,11 @@ class Migration:
             Source(id=33, name='33', external_id="33", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
             Source(id=34, name='34', external_id="34", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
             Source(id=35, name='35', external_id="35", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
-            Source(id=36, name='CNN NEWS', external_id="23", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=37, name='FOX NEWS', external_id="24", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=38, name='NY NEWS', external_id="25", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=39, name='THE GUARDIAN NEWS', external_id="26", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
-            Source(id=40, name='SUN NEWS', external_id="27", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=36, name='CNN NEWS', external_id="36", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=37, name='FOX NEWS', external_id="37", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=38, name='NY NEWS', external_id="38", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=39, name='THE GUARDIAN NEWS', external_id="39", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
+            Source(id=40, name='SUN NEWS', external_id="40", platform=PLATFORM_TYPE.TWITCH.name, is_hidden=False),
         ]
         source_dao.save(*initial_sources)
 

@@ -16,3 +16,4 @@ isort
 flake8
 py-automapper
 deep_translator
+openai~=1.0.0

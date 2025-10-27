@@ -129,6 +129,8 @@ class Manager:
 
         note.total_score = evaluationContext.total_score
         note.is_propaganda = evaluationContext.is_propaganda
+        note.reason = evaluationContext.chatgpt_reason
+        note.amount_of_propaganda_scores = evaluationContext.amount_of_propaganda_scores
         return note
 
     def get_visible_sources(self):

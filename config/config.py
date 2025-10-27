@@ -27,8 +27,12 @@ class Config:
         self.similarity_threshold = 1
         self.tg_api_id = 1
         self.tg_api_hash = 1
+        self.openai_api_key = ""
+        self.is_chatgpt_processor_enabled = False
 
 config = Config()
 config_file = read_config(CONFIG_FILE_NAME)
 config.average_news_simplicity = config_file['average_news_simplicity']
 config.similarity_threshold = config_file['similarity_threshold']
+config.openai_api_key = config_file.get('openai_api_key', '')
+config.is_chatgpt_processor_enabled = config_file.get('is_chatgpt_processor_enabled', False)

@@ -93,6 +93,8 @@ class EvaluationContext:
 
         self.total_score = 0
         self.is_propaganda = False
+        self.chatgpt_reason = None
+        self.amount_of_propaganda_scores = None
 
     def __str__(self) -> str:
         return f'sentimental_analysis_result: {self.sentimental_analysis_result},\n' \
@@ -427,6 +429,95 @@ class GeneralizationOfOpponents(Evaluation):
         evaluation_context.generalization_of_opponents = score
         evaluation_context.generalization_of_opponents_raw_result = score
 
+class ChatGPTAnalysis(Evaluation):
+
+    def __init__(self):
+        self.client = None
+        self.is_enabled = config.is_chatgpt_processor_enabled
+        
+        if self.is_enabled and config.openai_api_key:
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(api_key=config.openai_api_key)
+                print("[INFO] ChatGPT processor initialized successfully")
+            except Exception as e:
+                print(f"[ERROR] Failed to initialize ChatGPT processor: {e}")
+                self.is_enabled = False
+        else:
+            print("[INFO] ChatGPT processor disabled or API key not provided")
+
+    def should_process(self, evaluation_context: EvaluationContext) -> bool:
+        """
+        Determine if the content should be processed by ChatGPT.
+        Only process if total_score > 0.3 and processor is enabled.
+        """
+        return (self.is_enabled and 
+                self.client is not None and 
+                evaluation_context.total_score > 0.3)
+
+    def analyze_propaganda(self, evaluation_context: EvaluationContext) -> str:
+        """
+        Analyze the content using ChatGPT to explain why it might be propaganda.
+        Returns the explanation or empty string if analysis fails.
+        """
+        try:
+            start_time = time.perf_counter()
+            
+            # Prepare the prompt for ChatGPT
+            prompt = self._create_analysis_prompt(evaluation_context.data)
+            
+            # Call ChatGPT API
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": "You are an expert in media analysis and propaganda detection. Provide clear, objective explanations of why content might be considered propaganda."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                max_tokens=500,
+                temperature=0.3
+            )
+            
+            explanation = response.choices[0].message.content.strip()
+            
+            end_time = time.perf_counter()
+            execution_time = end_time - start_time
+            
+            print(f"[INFO] ChatGPT analysis completed in {execution_time:.2f}s")
+            
+            return explanation
+            
+        except Exception as e:
+            print(f"[ERROR] ChatGPT analysis failed: {e}")
+            return ""
+
+    def _create_analysis_prompt(self, content: str) -> str:
+        """
+        Create a focused prompt for ChatGPT to analyze propaganda content.
+        """
+        return f"""
+Analyze the following text content and explain why it might be considered propaganda. 
+Focus on identifying specific propaganda techniques, biased language, emotional manipulation, 
+or misleading information. Provide a clear, concise explanation (2-3 sentences) of the main 
+propaganda elements you identify.
+
+Text to analyze:
+"{content}"
+
+Please explain which propaganda techniques or elements are present in this text.
+"""
+
+    def evaluate(self, evaluation_context: EvaluationContext):
+        """
+        Evaluate the content using ChatGPT analysis if conditions are met.
+        """
+        evaluation_context.chatgpt_reason = self.analyze_propaganda(evaluation_context)
+
 class EvaluationProcessor:
 
     def __init__(self, note_dao: NoteDao):
@@ -436,6 +527,7 @@ class EvaluationProcessor:
                             TriggerTopics(), ClickBait(),
                             Subjective(), CallToAction(),
                             RepeatedNote(), RepeatedTake(), Messianism(), OppositionToOpponents(), GeneralizationOfOpponents()]
+        self.chatgpt_analysis = ChatGPTAnalysis()
 
     def evaluate(self, title, data, source_id):
         context = EvaluationContext(data, source_id, self.note_dao)
@@ -559,7 +651,127 @@ class EvaluationProcessor:
             case "Speaking a":
                 context.total_score = 0.44570138254975218
 
+        self.chatgpt_analysis.evaluate(context)
+
+        calculate_amount_of_propaganda_by_scores(context)
+
         return context
+
+def calculate_amount_of_propaganda_by_scores(context: EvaluationContext):
+    counter = 0
+    total_checks = 0
+    
+    # Get historical averages for each metric using RAW results (similar to recalculate_coefficient)
+    sentimental_avg = get_historical_average(Note.get_all_sentimental_scores_raw)
+    trigger_keywords_avg = get_historical_average(Note.get_all_triggered_keywords_raw)
+    trigger_topics_avg = get_historical_average(Note.get_all_triggered_topics_raw)
+    text_simplicity_avg = get_historical_average(Note.get_all_text_simplicity_deviations_raw)
+    confidence_factor_avg = get_historical_average(Note.get_all_confidence_factors_raw)
+    clickbait_avg = get_historical_average(Note.get_all_clickbait_scores_raw)
+    subjective_avg = get_historical_average(Note.get_all_subjectivity_scores_raw)
+    call_to_action_avg = get_historical_average(Note.get_all_call_to_action_scores_raw)
+    repeated_take_avg = get_historical_average(Note.get_all_repeated_takes_raw)
+    repeated_note_avg = get_historical_average(Note.get_all_repeated_notes_raw)
+    messianism_avg = get_historical_average(Note.get_all_messianism_raw)
+    opposition_to_opponents_avg = get_historical_average(Note.get_all_opposition_to_opponents_raw)
+    generalization_of_opponents_avg = get_historical_average(Note.get_all_generalization_of_opponents_raw)
+    
+    # Sentimental analysis check
+    if context.sentimental_analysis_raw_result is not None:
+        total_checks += 1
+        if context.sentimental_analysis_raw_result > sentimental_avg:
+            counter += 1
+    
+    # Trigger keywords check
+    if context.trigger_keywords_raw_result is not None:
+        total_checks += 1
+        if context.trigger_keywords_raw_result > trigger_keywords_avg:
+            counter += 1
+    
+    # Trigger topics check
+    if context.trigger_topics_raw_result is not None:
+        total_checks += 1
+        if context.trigger_topics_raw_result > trigger_topics_avg:
+            counter += 1
+    
+    # Text simplicity deviation check
+    if context.text_simplicity_deviation_raw_result is not None:
+        total_checks += 1
+        if context.text_simplicity_deviation_raw_result > text_simplicity_avg:
+            counter += 1
+    
+    # Confidence factor check
+    if context.confidence_factor_raw_result is not None:
+        total_checks += 1
+        if context.confidence_factor_raw_result > confidence_factor_avg:
+            counter += 1
+    
+    # Clickbait check
+    if context.clickbait_raw_result is not None:
+        total_checks += 1
+        if context.clickbait_raw_result > clickbait_avg:
+            counter += 1
+    
+    # Subjective check
+    if context.subjective_raw_result is not None:
+        total_checks += 1
+        if context.subjective_raw_result > subjective_avg:
+            counter += 1
+    
+    # Call to action check
+    if context.call_to_action_raw_result is not None:
+        total_checks += 1
+        if context.call_to_action_raw_result > call_to_action_avg:
+            counter += 1
+    
+    # Repeated take check
+    if context.repeated_take_raw_result is not None:
+        total_checks += 1
+        if context.repeated_take_raw_result > repeated_take_avg:
+            counter += 1
+    
+    # Repeated note check
+    if context.repeated_note_raw_result is not None:
+        total_checks += 1
+        if context.repeated_note_raw_result > repeated_note_avg:
+            counter += 1
+    
+    # Messianism check
+    if context.messianism_raw_result is not None:
+        total_checks += 1
+        if context.messianism_raw_result > messianism_avg:
+            counter += 1
+    
+    # Opposition to opponents check
+    if context.opposition_to_opponents_raw_result is not None:
+        total_checks += 1
+        if context.opposition_to_opponents_raw_result > opposition_to_opponents_avg:
+            counter += 1
+    
+    # Generalization of opponents check
+    if context.generalization_of_opponents_raw_result is not None:
+        total_checks += 1
+        if context.generalization_of_opponents_raw_result > generalization_of_opponents_avg:
+            counter += 1
+    
+    # Calculate percentage and assign to context
+    if total_checks > 0:
+        context.amount_of_propaganda_scores = counter / total_checks
+    else:
+        context.amount_of_propaganda_scores = 0
+
+def get_historical_average(get_all_scores):
+    """
+    Calculate the historical average for a specific metric across all notes.
+    Similar to recalculate_coefficient but returns the average instead of coefficient.
+    """
+    all_scores = get_all_scores()
+    if len(all_scores) == 0:
+        return 0.3  # Default threshold if no historical data
+    scores_sum = 0
+    for score in all_scores:
+        scores_sum += score
+    return scores_sum / len(all_scores)
 
 def recalculate_coefficient(get_all_scores):
     all_scores = get_all_scores()
