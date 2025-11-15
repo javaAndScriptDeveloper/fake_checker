@@ -501,15 +501,12 @@ class ChatGPTAnalysis(Evaluation):
         Create a focused prompt for ChatGPT to analyze propaganda content.
         """
         return f"""
-Analyze the following text content and explain why it might be considered propaganda. 
+Analyze the following text content whether it is propaganda. 
 Focus on identifying specific propaganda techniques, biased language, emotional manipulation, 
-or misleading information. Provide a clear, concise explanation (2-3 sentences) of the main 
-propaganda elements you identify.
+or misleading information. Provide a clear, concise explanation (2-3 sentences) in the Ukrainian language.
 
 Text to analyze:
 "{content}"
-
-Please explain which propaganda techniques or elements are present in this text.
 """
 
     def evaluate(self, evaluation_context: EvaluationContext):
