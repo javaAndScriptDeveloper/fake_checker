@@ -9,3 +9,32 @@ services:
     environment:
       POSTGRES_PASSWORD: password
       POSTGRESQL_DATABASE: fake_checker
+
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j_db
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/your_strong_password
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: 'yes'
+
+  neodash:
+    # Use the official image. Note: 'nielsdejong/neodash' is commonly used for the community version.
+    image: nielsdejong/neodash:latest
+    container_name: neodash_app
+    ports:
+      # NeoDash runs on port 5005 by default
+      - "5005:5005"
+    # Ensure NeoDash starts only after Neo4j is ready
+    depends_on:
+      - neo4j
+    networks:
+      - neo-network
+    restart: always
+
+  # Define the network for inter-container communication
+networks:
+  neo-network:
+    driver: bridge

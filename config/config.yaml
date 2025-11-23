@@ -1,4 +1,4 @@
 similarity_threshold : 0.85
 average_news_simplicity: 50
 openai_api_key: "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"
-is_chatgpt_processor_enabled: true
+is_chatgpt_processor_enabled: false

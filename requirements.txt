@@ -17,3 +17,4 @@ flake8
 py-automapper
 deep_translator
 openai~=1.0.0
+neo4j~=5.20.0

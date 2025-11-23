@@ -3,6 +3,7 @@ from processors.evaluation_processor import EvaluationProcessor
 from dal.dal import NoteDao, SourceDao, Migration
 from processors.fehner_processor import FehnerProcessor
 from translation import Translator
+from services.neo4j_service import Neo4jService
 
 note_dao = NoteDao()
 source_dao = SourceDao()
@@ -11,4 +12,5 @@ migration.execute()
 evaluation_processor = EvaluationProcessor(note_dao)
 fehner_processor = FehnerProcessor(note_dao)
 translator = Translator()
-manager = Manager(evaluation_processor, note_dao, source_dao, fehner_processor, translator)
+neo4j_service = Neo4jService()
+manager = Manager(evaluation_processor, note_dao, source_dao, fehner_processor, translator, neo4j_service)

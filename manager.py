@@ -17,12 +17,14 @@ class Manager:
                  note_dao: NoteDao,
                  source_dao: SourceDao,
                  fehner_processor: FehnerProcessor,
-                 translator: Translator):
+                 translator: Translator,
+                 neo4j_service=None):
         self.evaluation_processor = evaluation_processor
         self.note_dao = note_dao
         self.source_dao = source_dao
         self.fehner_processor = fehner_processor
         self.translator = translator
+        self.neo4j_service = neo4j_service
 
         self.coldstart("/home/vampir/lolitech/study/science/code/data/coldstart")
         #self.process_initial("/home/vampir/lolitech/dissertation/data/initial")
@@ -66,6 +68,18 @@ class Manager:
         self.fehner_processor.process(text, note)
         note.hash = hash
         self.note_dao.save(note)
+        
+        # Post-processing: Save to Neo4j
+        if self.neo4j_service and note.id:
+            try:
+                source = self.source_dao.get_by_id(source_id)
+                if source:
+                    self.neo4j_service.save_note(note, source, title)
+                else:
+                    print(f"⚠️ Warning: Source with ID {source_id} not found, skipping Neo4j save")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to save to Neo4j: {e}")
+        
         return note
 
     def _resolve_text_hash(self, text: str) -> str:
