@@ -13,6 +13,9 @@ from transformers import pipeline
 from config.config import config
 from dal.dal import NoteDao, Note
 from processors.clickbait_title.clickbait_detector import is_clickbait
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 spacy.cli.download("en_core_web_sm")
 nlp = spacy.load('en_core_web_sm')
@@ -255,7 +258,7 @@ class CallToAction(Evaluation):
                 data = json.load(file)
                 return set(keyword.lower() for keyword in data.get("keywords", []))
         except Exception as e:
-            print(f"[ERROR] Failed to load call-to-action keywords: {e}")
+            logger.error(f"Failed to load call-to-action keywords: {e}", exc_info=True)
             return set()
 
     def is_call_to_action_token(self, token) -> bool:
@@ -363,7 +366,7 @@ class Messianism(Evaluation):
                 data = json.load(f)
                 return data.get("phrases", [])
         except Exception as e:
-            print(f"[ERROR] Could not load messiah phrases: {e}")
+            logger.error(f"Could not load messiah phrases: {e}", exc_info=True)
             return []
 
     def evaluate(self, evaluation_context: EvaluationContext):
@@ -390,7 +393,7 @@ class OppositionToOpponents(Evaluation):
                 data = json.load(f)
                 return data.get("phrases", [])
         except Exception as e:
-            print(f"[ERROR] Could not load data: {e}")
+            logger.error(f"Could not load data from {file_path}: {e}", exc_info=True)
             return []
 
     def evaluate(self, evaluation_context: EvaluationContext):
@@ -416,7 +419,7 @@ class GeneralizationOfOpponents(Evaluation):
                 data = json.load(f)
                 return data.get("phrases", [])
         except Exception as e:
-            print(f"[ERROR] Could not load data: {e}")
+            logger.error(f"Could not load data from {file_path}: {e}", exc_info=True)
             return []
 
     def evaluate(self, evaluation_context: EvaluationContext):
@@ -439,12 +442,12 @@ class ChatGPTAnalysis(Evaluation):
             try:
                 from openai import OpenAI
                 self.client = OpenAI(api_key=config.openai_api_key)
-                print("[INFO] ChatGPT processor initialized successfully")
+                logger.info("ChatGPT processor initialized successfully")
             except Exception as e:
-                print(f"[ERROR] Failed to initialize ChatGPT processor: {e}")
+                logger.error(f"Failed to initialize ChatGPT processor: {e}", exc_info=True)
                 self.is_enabled = False
         else:
-            print("[INFO] ChatGPT processor disabled or API key not provided")
+            logger.info("ChatGPT processor disabled or API key not provided")
 
     def should_process(self, evaluation_context: EvaluationContext) -> bool:
         """
@@ -460,6 +463,10 @@ class ChatGPTAnalysis(Evaluation):
         Analyze the content using ChatGPT to explain why it might be propaganda.
         Returns the explanation or empty string if analysis fails.
         """
+        # Check if client is available before proceeding
+        if self.client is None:
+            return ""
+        
         try:
             start_time = time.perf_counter()
             
@@ -488,12 +495,12 @@ class ChatGPTAnalysis(Evaluation):
             end_time = time.perf_counter()
             execution_time = end_time - start_time
             
-            print(f"[INFO] ChatGPT analysis completed in {execution_time:.2f}s")
+            logger.info(f"ChatGPT analysis completed in {execution_time:.2f}s")
             
             return explanation
             
         except Exception as e:
-            print(f"[ERROR] ChatGPT analysis failed: {e}")
+            logger.error(f"ChatGPT analysis failed: {e}", exc_info=True)
             return ""
 
     def _create_analysis_prompt(self, content: str) -> str:
@@ -513,7 +520,10 @@ Text to analyze:
         """
         Evaluate the content using ChatGPT analysis if conditions are met.
         """
-        evaluation_context.chatgpt_reason = self.analyze_propaganda(evaluation_context)
+        if self.should_process(evaluation_context):
+            evaluation_context.chatgpt_reason = self.analyze_propaganda(evaluation_context)
+        else:
+            evaluation_context.chatgpt_reason = None
 
 class EvaluationProcessor:
 

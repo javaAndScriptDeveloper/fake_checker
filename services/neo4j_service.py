@@ -5,6 +5,9 @@ from typing import Optional
 from neo4j import GraphDatabase
 
 from dal.dal import Note, Source
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Neo4jService:
@@ -25,16 +28,15 @@ class Neo4jService:
         self.database = database
         try:
             self.driver.verify_connectivity()
-            print("✅ Connection to Neo4j established.")
+            logger.info("Connection to Neo4j established")
         except Exception as e:
-            print(f"⚠️ Warning: Could not connect to Neo4j: {e}")
-            print("Neo4j operations will be skipped.")
+            logger.warning(f"Could not connect to Neo4j: {e}. Neo4j operations will be skipped.")
 
     def close(self):
         """Close the Neo4j driver connection."""
         if self.driver:
             self.driver.close()
-            print("Neo4j connection closed.")
+            logger.info("Neo4j connection closed")
 
     def _execute_write(self, query: str, parameters: Optional[dict] = None):
         """Helper for write operations, ensuring 'w' routing."""
@@ -44,7 +46,7 @@ class Neo4jService:
             )
             return records, summary
         except Exception as e:
-            print(f"Error executing Neo4j write query: {e}")
+            logger.error(f"Error executing Neo4j write query: {e}", exc_info=True)
             return None, None
 
     def save_source(self, source: Source) -> Optional[str]:
@@ -87,7 +89,7 @@ class Neo4jService:
         
         records, summary = self._execute_write(query, params)
         if records and summary:
-            print(f"✅ Saved Source to Neo4j: {source.name} (ID: {source.id})")
+            logger.info(f"Saved Source to Neo4j: {source.name} (ID: {source.id})")
             return records[0]["uuid"] if records else source_uuid
         return None
 
@@ -254,7 +256,41 @@ class Neo4jService:
         
         records, summary = self._execute_write(query, params)
         if records and summary:
-            print(f"✅ Saved Note to Neo4j: {title or 'Untitled'} (ID: {note.id})")
-            return records[0]["uuid"] if records else note_uuid
+            note_uuid_result = records[0]["uuid"] if records else note_uuid
+            logger.info(f"Saved Note to Neo4j: {title or 'Untitled'} (ID: {note.id})")
+            
+            # Create REPOST relationship if this note reposts from another source
+            if note.reposted_from_source_id:
+                self._create_repost_relationship(note.id, note.reposted_from_source_id)
+            
+            return note_uuid_result
         return None
+    
+    def _create_repost_relationship(self, reposting_note_id: int, reposted_source_id: int):
+        """
+        Create a REPOST relationship between a note and the source it reposted from in Neo4j.
+        
+        Args:
+            reposting_note_id: ID of the note that is reposting
+            reposted_source_id: ID of the source that was reposted from
+        """
+        query = """
+        MATCH (reposting:Note {postgres_id: $reposting_id})
+        MATCH (reposted_source:Source {postgres_id: $reposted_source_id})
+        MERGE (reposting)-[r:REPOSTS_FROM]->(reposted_source)
+        SET r.created_at = $created_at
+        RETURN r
+        """
+        
+        params = {
+            "reposting_id": reposting_note_id,
+            "reposted_source_id": reposted_source_id,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        records, summary = self._execute_write(query, params)
+        if records and summary:
+            logger.info(f"Created REPOST relationship: Note {reposting_note_id} -> Source {reposted_source_id}")
+        else:
+            logger.warning(f"Could not create REPOST relationship between note {reposting_note_id} and source {reposted_source_id}")
 

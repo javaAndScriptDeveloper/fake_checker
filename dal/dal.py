@@ -100,6 +100,7 @@ class Note(Base):
     amount_of_propaganda_scores = Column(Numeric, nullable=True)
     hash = Column(String)
     source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
+    reposted_from_source_id = Column(Integer, ForeignKey('sources.id'), nullable=True)
     created_at = Column(DateTime, default=func.now(), server_default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

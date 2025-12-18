@@ -2,12 +2,16 @@ import csv
 import hashlib
 import json
 import os
+import time
 from datetime import datetime
 
 from dal.dal import Note, NoteDao, SourceDao
 from processors.evaluation_processor import EvaluationContext, EvaluationProcessor
 from processors.fehner_processor import FehnerProcessor
 from translation import Translator
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Manager:
@@ -33,31 +37,47 @@ class Manager:
         for filename in os.listdir(path_to_coldstart_files):
             file_path = os.path.join(path_to_coldstart_files, filename)
             try:
+                start_time = time.perf_counter()
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('title'), data.get('content'), data.get('source_id'), data.get('language'))
-
-                    print(f"Processed coldstart file: {filename}")
+                    content = data.get('content', '')
+                    title = data.get('title', '')
+                    word_count = self._count_words(content)
+                    self.process(title, content, data.get('source_id'), data.get('language'), data.get('repostedFrom'))
+                
+                elapsed_time = time.perf_counter() - start_time
+                time_str = self._format_processing_time(elapsed_time)
+                speed = word_count / elapsed_time if elapsed_time > 0 else 0
+                self._print_processing_metadata(filename, word_count, elapsed_time, speed)
+                logger.info(f"Processed coldstart file: {filename} (took {time_str})")
             except Exception as e:
-                print(f"Error reading {filename}: {e}")
+                logger.error(f"Error reading coldstart file {filename}: {e}", exc_info=True)
 
     def process_initial(self, path_to_pre_saved):
         for filename in os.listdir(path_to_pre_saved):
             file_path = os.path.join(path_to_pre_saved, filename)
             try:
+                start_time = time.perf_counter()
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.process(data.get('title'), data.get('content'), data.get('source_id'), data.get('language'))
-
-                    print(f"Processed initial file: {filename}")
+                    content = data.get('content', '')
+                    title = data.get('title', '')
+                    word_count = self._count_words(content)
+                    self.process(title, content, data.get('source_id'), data.get('language'), data.get('repostedFrom'))
+                
+                elapsed_time = time.perf_counter() - start_time
+                time_str = self._format_processing_time(elapsed_time)
+                speed = word_count / elapsed_time if elapsed_time > 0 else 0
+                self._print_processing_metadata(filename, word_count, elapsed_time, speed)
+                logger.info(f"Processed initial file: {filename} (took {time_str})")
             except Exception as e:
-                print(f"Error reading {filename}: {e}")
+                logger.error(f"Error reading initial file {filename}: {e}", exc_info=True)
 
-    def process(self, title,  text, source_id, language):
+    def process(self, title,  text, source_id, language, reposted_from_source_id=None):
         hash = self._resolve_text_hash(text)
         text_by_hash = self.note_dao.get_by_hash(hash)
         if text_by_hash is not None:
-            print(f"Skipped processing already processed text: {text[:16]}...")
+            logger.debug(f"Skipped processing already processed text: {text[:16]}...")
             return text_by_hash
         if (language != "english"):
             title = self.translator.translate_to_english(title, language)
@@ -67,6 +87,11 @@ class Manager:
         note = self._mapEvaluationContext(evaluation_context, note)
         self.fehner_processor.process(text, note)
         note.hash = hash
+        
+        # Handle repost relationship: link directly to source
+        if reposted_from_source_id is not None:
+            note.reposted_from_source_id = reposted_from_source_id
+        
         self.note_dao.save(note)
         
         # Post-processing: Save to Neo4j
@@ -75,15 +100,99 @@ class Manager:
                 source = self.source_dao.get_by_id(source_id)
                 if source:
                     self.neo4j_service.save_note(note, source, title)
+                    if note.reposted_from_source_id:
+                        logger.info(f"Note {note.id} reposts from source {note.reposted_from_source_id}")
                 else:
-                    print(f"⚠️ Warning: Source with ID {source_id} not found, skipping Neo4j save")
+                    logger.warning(f"Source with ID {source_id} not found, skipping Neo4j save")
             except Exception as e:
-                print(f"⚠️ Warning: Failed to save to Neo4j: {e}")
+                logger.error(f"Failed to save to Neo4j: {e}", exc_info=True)
         
         return note
 
     def _resolve_text_hash(self, text: str) -> str:
         return hashlib.md5(text.encode('utf-8')).hexdigest()
+    
+    def _count_words(self, content: str, title: str = '') -> int:
+        """
+        Count words in content only (excluding title/headline).
+        
+        Args:
+            content: Main content text
+            title: Optional title text (not counted)
+            
+        Returns:
+            Word count in content only
+        """
+        if not content:
+            return 0
+        # Simple word count - split by whitespace (only content, not title)
+        words = content.split()
+        return len(words)
+    
+    def _format_processing_time(self, seconds: float) -> str:
+        """
+        Format processing time in a human-readable way.
+        
+        Args:
+            seconds: Time in seconds (float)
+            
+        Returns:
+            Human-readable time string (e.g., "2.5 seconds", "1 minute 23 seconds")
+        """
+        if seconds < 1:
+            milliseconds = int(seconds * 1000)
+            return f"{milliseconds} ms"
+        elif seconds < 60:
+            return f"{seconds:.2f} seconds"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            secs = seconds % 60
+            if secs < 1:
+                return f"{minutes} minute{'s' if minutes != 1 else ''}"
+            else:
+                return f"{minutes} minute{'s' if minutes != 1 else ''} {secs:.1f} second{'s' if secs != 1 else ''}"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = seconds % 60
+            parts = [f"{hours} hour{'s' if hours != 1 else ''}"]
+            if minutes > 0:
+                parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+            if secs > 0 and minutes == 0:  # Only show seconds if no minutes
+                parts.append(f"{secs:.1f} second{'s' if secs != 1 else ''}")
+            return " ".join(parts)
+    
+    def _print_processing_metadata(self, filename: str, word_count: int, elapsed_time: float, speed: float):
+        """
+        Print colored metadata block with processing information.
+        
+        Args:
+            filename: Name of the processed file
+            word_count: Number of words processed
+            elapsed_time: Time taken in seconds
+            speed: Words per second
+        """
+        # ANSI color codes
+        RESET = '\033[0m'
+        BOLD = '\033[1m'
+        CYAN = '\033[96m'
+        GREEN = '\033[92m'
+        YELLOW = '\033[93m'
+        BLUE = '\033[94m'
+        MAGENTA = '\033[95m'
+        
+        time_str = self._format_processing_time(elapsed_time)
+        speed_str = f"{speed:.1f} words/sec" if speed >= 1 else f"{speed * 1000:.0f} words/ms"
+        
+        # Create metadata block
+        print(f"\n{CYAN}{'='*60}{RESET}")
+        print(f"{BOLD}{CYAN}📄 Processing Metadata{RESET}")
+        print(f"{CYAN}{'='*60}{RESET}")
+        print(f"{GREEN}File:{RESET}        {filename}")
+        print(f"{YELLOW}Words:{RESET}        {word_count:,} words")
+        print(f"{BLUE}Time:{RESET}         {time_str}")
+        print(f"{MAGENTA}Speed:{RESET}       {speed_str}")
+        print(f"{CYAN}{'='*60}{RESET}\n")
 
     def _mapEvaluationContext(self, evaluationContext: EvaluationContext, note: Note):
         note.content = evaluationContext.data
@@ -178,4 +287,4 @@ class Manager:
             writer = csv.writer(file)
             for row in data:
                 writer.writerow(row)
-        print(f"CSV exported to {file_path}")
+        logger.info(f"CSV exported to {file_path}")

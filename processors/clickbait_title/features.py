@@ -143,7 +143,11 @@ def avg_char_num(headlines: list) -> ndarray:
         tokenized = nltk.word_tokenize(headline.lower())
         for token in tokenized:
             token_lengths.append(len(token))
-        headline_avg = sum(token_lengths) / len(token_lengths)  # unrounded
+        # Handle empty headline or no tokens
+        if len(token_lengths) == 0:
+            headline_avg = 0.0
+        else:
+            headline_avg = sum(token_lengths) / len(token_lengths)  # unrounded
         bow.append(headline_avg)
     bow_np = np.array(bow).astype(float)
     return bow_np
@@ -164,7 +168,11 @@ def ttr_normalized(headlines: list) -> ndarray:
         num_tokens = len(no_stopwords)
         unique_tokens = set(no_stopwords)
         num_unique_tokens = len(unique_tokens)
-        ttr = round((num_unique_tokens / num_tokens), 3)
+        # Handle division by zero for empty headlines
+        if num_tokens == 0:
+            ttr = 0.0
+        else:
+            ttr = round((num_unique_tokens / num_tokens), 3)
         bow.append(ttr)
     bow_np = np.array(bow).astype(float)
     return bow_np
