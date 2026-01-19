@@ -188,19 +188,18 @@ The UI provides:
 - **Ratings Tab**: See source ratings and statistics
 - **System Info Tab**: System configuration and status
 
-### Processing Files Programmatically
+### Running Examples
 
-Use the `examples.py` script:
+You can run the examples script to see the system in action, including the new repost depth feature:
 
-```python
-from examples import process_file
-
-process_file("data/examples/putin_speech.json")
+```bash
+python examples.py
 ```
 
-### Command Line Processing
-
-The system automatically processes files in `data/coldstart/` on startup.
+This script will:
+1. Process several historical and modern speeches.
+2. Demonstrate the **Repost Depth** feature by creating a multi-level chain of reposts.
+3. Output processing metadata (time, speed, etc.).
 
 ## Repost Analysis Feature
 
@@ -325,13 +324,25 @@ RETURN
 ORDER BY note.postgres_id DESC
 ```
 
-### Repost Chains
+### Repost Chains and Depth
 
+Find if there are any chains of reposts:
 ```cypher
-// Find if there are any chains of reposts
 MATCH path = (note1:Note)-[:REPOSTS_FROM]->(source1:Source)<-[:PUBLISHED]-(note2:Note)-[:REPOSTS_FROM]->(source2:Source)
 RETURN path
 LIMIT 50
+```
+
+### Depth of Reposts (Note-to-Note)
+
+If using a note-to-note reference model (as in `neo4j_poc.py`), you can calculate the depth of a repost chain from the original post:
+
+```cypher
+// Calculate the depth of reposts (chains of REFERENCES)
+MATCH path = (n:Note)-[:REFERENCES*]->(root:Note)
+WHERE NOT (root)-[:REFERENCES]->()
+RETURN n.name AS Note, root.name AS OriginalPost, length(path) AS Depth
+ORDER BY Depth DESC
 ```
 
 ## Configuration

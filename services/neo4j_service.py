@@ -262,10 +262,25 @@ class Neo4jService:
             # Create REPOST relationship if this note reposts from another source
             if note.reposted_from_source_id:
                 self._create_repost_relationship(note.id, note.reposted_from_source_id)
+                self._link_to_original_note(note.id, note.reposted_from_source_id)
             
             return note_uuid_result
         return None
     
+    def _link_to_original_note(self, note_id: int, original_source_id: int):
+        """
+        Attempt to link a reposted note to the actual note it's referencing, 
+        if that original note was published by the original source.
+        """
+        query = """
+        MATCH (new_note:Note {postgres_id: $note_id})
+        MATCH (old_note:Note)-[:PUBLISHED]-(s:Source {postgres_id: $original_source_id})
+        WHERE old_note.hash = new_note.hash AND old_note.postgres_id <> new_note.postgres_id
+        MERGE (new_note)-[:REFERENCES]->(old_note)
+        """
+        params = {"note_id": note_id, "original_source_id": original_source_id}
+        self._execute_write(query, params)
+
     def _create_repost_relationship(self, reposting_note_id: int, reposted_source_id: int):
         """
         Create a REPOST relationship between a note and the source it reposted from in Neo4j.

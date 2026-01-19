@@ -7,9 +7,9 @@ from enums import PLATFORM_TYPE
 from singletons import manager, source_dao
 
 
-def create_new_source():
-    id = random.randint(10000, 99999)
-    source = Source(id=id, name=str(id), external_id=str(id), platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=False)
+def create_new_source(fixed_id=None):
+    id = fixed_id if fixed_id is not None else random.randint(10000, 99999)
+    source = Source(id=id, name=f"Source {id}", external_id=str(id), platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=False)
     source_dao.save(source)
     return id
 
@@ -78,10 +78,17 @@ def print_processing_metadata(path: str, word_count: int, elapsed_time: float, s
     print(f"{CYAN}{'='*60}{RESET}\n")
 
 
-def process_file(path):
+def process_file(path, fixed_source_id=None):
     start_time = time.perf_counter()
-    source_id = create_new_source()
     file = read_file(path)
+    
+    # Use fixed_source_id if provided, otherwise check file, otherwise create new
+    source_id = fixed_source_id or file.get("source_id") or create_new_source()
+    
+    # Ensure source exists in DB (especially for fixed IDs)
+    if not source_dao.get_by_id(source_id):
+        create_new_source(source_id)
+        
     title = file.get("title", "")
     content = file.get("content", "")
     reposted_from = file.get("repostedFrom")
@@ -92,13 +99,36 @@ def process_file(path):
     print_processing_metadata(path, word_count, elapsed_time, speed)
     return result
 
-process_file("data/examples/putin_address_to_general_assambly.json")
-process_file("data/examples/macron_vision.json")
-process_file("data/examples/trump_tulsa.json")
-process_file("data/examples/trump_we_will_never_give_up.json")
-process_file("data/examples/hitler_proclamation_to_german_nation.json")
-process_file("data/examples/hitler_sportpalats_speech.json")
-process_file("data/examples/linear_geometry.json")
-process_file("data/examples/magic_of_math.json")
-process_file("data/examples/ocean_investigations.json")
-process_file("data/examples/farming_apples.json")
+
+def demonstrate_repost_depth():
+    """Demonstrates the depth of reposts feature by processing a chain of related notes."""
+    print("\n" + "="*60)
+    print("🚀 DEMONSTRATING REPOST DEPTH FEATURE")
+    print("="*60)
+    
+    # Process the chain in order
+    process_file("data/examples/chain_1_original.json")
+    process_file("data/examples/chain_2_repost.json")
+    process_file("data/examples/chain_3_repost.json")
+    
+    print("\n✅ Repost chain processed.")
+    print("Check Neo4j for the following chain:")
+    print("Source 103 (Note) -> Source 102 (Source) <- Source 102 (Note) -> Source 101 (Source)")
+    print("="*60 + "\n")
+
+
+if __name__ == "__main__":
+    # Original examples
+    process_file("data/examples/putin_address_to_general_assambly.json")
+    process_file("data/examples/macron_vision.json")
+    process_file("data/examples/trump_tulsa.json")
+    process_file("data/examples/trump_we_will_never_give_up.json")
+    process_file("data/examples/hitler_proclamation_to_german_nation.json")
+    process_file("data/examples/hitler_sportpalats_speech.json")
+    process_file("data/examples/linear_geometry.json")
+    process_file("data/examples/magic_of_math.json")
+    process_file("data/examples/ocean_investigations.json")
+    process_file("data/examples/farming_apples.json")
+
+    # New Repost Depth Example
+    demonstrate_repost_depth()

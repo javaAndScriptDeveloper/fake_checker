@@ -128,7 +128,7 @@ class NoteManager:
         print(f"Deleted Note {note_uuid[:8]}... Nodes deleted: {summary.counters.nodes_deleted}")
         return summary.counters.nodes_deleted > 0
 
-    # --- Visualization Query ---
+    # --- Visualization and Analytics Queries ---
 
     def get_notes_network_cypher(self):
         """Cypher query to return a sample graph for visualization in Neo4j Browser."""
@@ -147,6 +147,26 @@ class NoteManager:
         # Optionally, read the data to confirm it's structured for the browser
         records = self._execute_read(query)
         print(f"Query returned {len(records)} records for visualization.")
+        return records
+
+    def get_repost_depth_cypher(self):
+        """Cypher query to calculate the depth of reposts (chains of REFERENCES)."""
+        query = """
+        MATCH path = (n:Note)-[:REFERENCES*]->(root:Note)
+        WHERE NOT (root)-[:REFERENCES]->()
+        RETURN n.name AS Note, root.name AS OriginalPost, length(path) AS Depth
+        ORDER BY Depth DESC
+        """
+        print("\n--- Repost Depth Query ---")
+        print("Run the following Cypher query to see the depth of reposts:")
+        print("-" * 70)
+        print(query)
+        print("-" * 70)
+
+        records = self._execute_read(query)
+        print(f"Found {len(records)} repost chains.")
+        for record in records:
+            print(f"Note: '{record['Note']}' is at depth {record['Depth']} from original: '{record['OriginalPost']}'")
         return records
 
 
@@ -169,6 +189,15 @@ def run_sample_data(manager):
                                      ref_note_uuid=note1_uuid)
     # Note 4 references Note 2
     note4_uuid = manager.create_note("Bob", "Next Steps", "Reviewing Bob's tech stack notes.", ref_note_uuid=note2_uuid)
+
+    # --- Repost Chain Example ---
+    manager.create_author("Charlie")
+    manager.create_author("Dave")
+    manager.create_author("Eve")
+
+    repost1_uuid = manager.create_note("Charlie", "Repost 1", "Charlie reposts Alice's initial idea.", ref_note_uuid=note1_uuid)
+    repost2_uuid = manager.create_note("Dave", "Repost 2", "Dave reposts Charlie's repost.", ref_note_uuid=repost1_uuid)
+    repost3_uuid = manager.create_note("Eve", "Repost 3", "Eve reposts Dave's repost.", ref_note_uuid=repost2_uuid)
 
     print("\n=============== CRUD Demonstration ===============")
 
@@ -197,6 +226,7 @@ def run_sample_data(manager):
 
     # Visualization
     manager.get_notes_network_cypher()
+    manager.get_repost_depth_cypher()
 
 
 if __name__ == "__main__":
