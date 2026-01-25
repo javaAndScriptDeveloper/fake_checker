@@ -46,11 +46,23 @@ def prepare_model():
     return model, top_words
 
 
-model, top_words = prepare_model()
+# Lazy load model - only prepare when needed
+_model = None
+_top_words = None
+
+
+def _get_model():
+    """Get or create the model (lazy loading)."""
+    global _model, _top_words
+    if _model is None:
+        _model, _top_words = prepare_model()
+    return _model, _top_words
 
 
 def is_clickbait(text):
     """Determines if a given text is clickbait using the trained model."""
+    model, top_words = _get_model()
+    
     # Extract features for input text using the same top words
     text_features = np.concatenate(
         (

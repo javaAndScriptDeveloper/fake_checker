@@ -1,9 +1,12 @@
 from manager import Manager
 from processors.evaluation_processor import EvaluationProcessor
-from dal.dal import NoteDao, SourceDao, Migration
+from dal.dal import NoteDao, SourceDao, Migration, initialize_database
 from processors.fehner_processor import FehnerProcessor
 from translation import Translator
 from services.neo4j_service import Neo4jService
+
+# Initialize database
+initialize_database()
 
 note_dao = NoteDao()
 source_dao = SourceDao()

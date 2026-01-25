@@ -17,8 +17,20 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-spacy.cli.download("en_core_web_sm")
-nlp = spacy.load('en_core_web_sm')
+# Lazy load spacy model to prevent hanging during imports
+_nlp = None
+
+def get_nlp():
+    """Get or create the spacy model (lazy loading)."""
+    global _nlp
+    if _nlp is None:
+        try:
+            nlp = spacy.load('en_core_web_sm')
+        except OSError:
+            spacy.cli.download("en_core_web_sm")
+            nlp = spacy.load('en_core_web_sm')
+        _nlp = nlp
+    return _nlp
 
 
 class EvaluationContext:
@@ -129,10 +141,17 @@ class Evaluation(ABC):
         pass
 
 class SentimentalAnalysis(Evaluation):
+    _pipeline = None
+
+    @property
+    def pipeline(self):
+        if self._pipeline is None:
+            self._pipeline = pipeline("sentiment-analysis")
+        return self._pipeline
 
     def evaluate(self, evaluation_context):
         start_time = time.perf_counter()
-        sentiment_pipeline = pipeline("sentiment-analysis")
+        sentiment_pipeline = self.pipeline
         result = sentiment_pipeline([evaluation_context.data])[0]
         evaluation_context.sentimental_analysis_result = result['score']
         evaluation_context.sentimental_analysis_raw_result = evaluation_context.sentimental_analysis_result
@@ -172,7 +191,13 @@ class TriggerKeywords(Evaluation):
 
 
 class TriggerTopics(Evaluation):
-    classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+    _classifier = None
+    
+    @property
+    def classifier(self):
+        if self._classifier is None:
+            self._classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        return self._classifier
 
     def parse_config(self):
         with open('/home/vampir/lolitech/study/science/code/config/trigger_topics.json', 'r', encoding='utf-8') as file:
@@ -268,7 +293,7 @@ class CallToAction(Evaluation):
         start_time = time.perf_counter()
 
         text = evaluation_context.data
-        doc = nlp(text)
+        doc = get_nlp()(text)
 
         # Count matching CTA verbs
         cta_count = sum(1 for token in doc if self.is_call_to_action_token(token))
@@ -283,7 +308,7 @@ class RepeatedNote(Evaluation):
 
     def get_embedding(self, text):
         """Generate an embedding for a single text."""
-        doc = nlp(text)
+        doc = get_nlp()(text)
         return doc.vector
 
     def check_similarity(self, reference_text, text_list):
@@ -315,7 +340,7 @@ class RepeatedTake(Evaluation):
         """Generate embeddings for a list of sentences."""
         embeddings = []
         for sentence in sentences:
-            doc = nlp(sentence)
+            doc = get_nlp()(sentence)
             embeddings.append(doc.vector)
         return np.array(embeddings)
 
@@ -341,7 +366,7 @@ class RepeatedTake(Evaluation):
         text = evaluation_context.data
 
         # Split text into sentences
-        doc = nlp(text)
+        doc = get_nlp()(text)
         sentences = [sent.text.strip() for sent in doc.sents]
 
         # Check for repeated sentences
@@ -356,9 +381,27 @@ class RepeatedTake(Evaluation):
 class Messianism(Evaluation):
 
     def __init__(self):
-        self.model = SentenceTransformer('all-mpnet-base-v2')
-        self.messiah_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/messiah.json")
-        self.messiah_embs = self.model.encode(self.messiah_phrases, convert_to_tensor=True)
+        self._model = None
+        self._messiah_phrases = None
+        self._messiah_embs = None
+    
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = SentenceTransformer('all-mpnet-base-v2')
+        return self._model
+    
+    @property
+    def messiah_phrases(self):
+        if self._messiah_phrases is None:
+            self._messiah_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/messiah.json")
+        return self._messiah_phrases
+    
+    @property
+    def messiah_embs(self):
+        if self._messiah_embs is None:
+            self._messiah_embs = self.model.encode(self.messiah_phrases, convert_to_tensor=True)
+        return self._messiah_embs
 
     def load_messiah_phrases(self, file_path):
         try:
@@ -383,9 +426,27 @@ class Messianism(Evaluation):
 class OppositionToOpponents(Evaluation):
 
     def __init__(self):
-        self.model = SentenceTransformer('all-mpnet-base-v2')
-        self.opposition_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/opposition_to_opponents.json")
-        self.embs = self.model.encode(self.opposition_phrases, convert_to_tensor=True)
+        self._model = None
+        self._opposition_phrases = None
+        self._embs = None
+    
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = SentenceTransformer('all-mpnet-base-v2')
+        return self._model
+    
+    @property
+    def opposition_phrases(self):
+        if self._opposition_phrases is None:
+            self._opposition_phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/opposition_to_opponents.json")
+        return self._opposition_phrases
+    
+    @property
+    def embs(self):
+        if self._embs is None:
+            self._embs = self.model.encode(self.opposition_phrases, convert_to_tensor=True)
+        return self._embs
 
     def load_messiah_phrases(self, file_path):
         try:
@@ -409,9 +470,27 @@ class OppositionToOpponents(Evaluation):
 class GeneralizationOfOpponents(Evaluation):
 
     def __init__(self):
-        self.model = SentenceTransformer('all-mpnet-base-v2')
-        self.phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/generalization_of_opponents.json")
-        self.embs = self.model.encode(self.phrases, convert_to_tensor=True)
+        self._model = None
+        self._phrases = None
+        self._embs = None
+    
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = SentenceTransformer('all-mpnet-base-v2')
+        return self._model
+    
+    @property
+    def phrases(self):
+        if self._phrases is None:
+            self._phrases = self.load_messiah_phrases("/home/vampir/lolitech/study/science/code/config/generalization_of_opponents.json")
+        return self._phrases
+    
+    @property
+    def embs(self):
+        if self._embs is None:
+            self._embs = self.model.encode(self.phrases, convert_to_tensor=True)
+        return self._embs
 
     def load_messiah_phrases(self, file_path):
         try:

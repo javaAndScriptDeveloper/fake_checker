@@ -209,7 +209,10 @@ class Note(Base):
     def get_all_generalization_of_opponents_raw(cls):
         return [row[0] for row in session.query(cls.generalization_of_opponents_raw).all()]
 
-Base.metadata.create_all(engine)
+
+def initialize_database():
+    """Initialize database tables. Call this explicitly when needed."""
+    Base.metadata.create_all(engine)
 
 
 class BaseDao:

@@ -7,8 +7,16 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: password
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: password
       POSTGRESQL_DATABASE: fake_checker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/bitnami/postgresql
 
   neo4j:
     image: neo4j:latest
@@ -19,6 +27,11 @@ services:
     environment:
       NEO4J_AUTH: neo4j/your_strong_password
       NEO4J_ACCEPT_LICENSE_AGREEMENT: 'yes'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   neodash:
     # Use the official image. Note: 'nielsdejong/neodash' is commonly used for the community version.
@@ -29,12 +42,17 @@ services:
       - "5005:5005"
     # Ensure NeoDash starts only after Neo4j is ready
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     networks:
       - neo-network
     restart: always
 
-  # Define the network for inter-container communication
+# Define the network for inter-container communication
 networks:
   neo-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
