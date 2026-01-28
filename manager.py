@@ -5,6 +5,7 @@ import os
 import time
 from datetime import datetime
 
+from config.paths import COLDSTART_DIR
 from dal.dal import Note, NoteDao, SourceDao
 from processors.evaluation_processor import EvaluationContext, EvaluationProcessor
 from processors.fehner_processor import FehnerProcessor
@@ -30,7 +31,7 @@ class Manager:
         self.translator = translator
         self.neo4j_service = neo4j_service
 
-        self.coldstart("/home/vampir/lolitech/study/science/code/data/coldstart")
+        self.coldstart(COLDSTART_DIR)
         #self.process_initial("/home/vampir/lolitech/dissertation/data/initial")
 
     def coldstart(self, path_to_coldstart_files):

@@ -1,6 +1,7 @@
+import os
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
 from neo4j import GraphDatabase
 
@@ -13,9 +14,16 @@ logger = get_logger(__name__)
 class Neo4jService:
     """Service for saving notes and sources to Neo4j graph database."""
 
-    def __init__(self, uri: str = "bolt://localhost:7687", 
-                 auth: tuple = ("neo4j", "your_strong_password"),
-                 database: str = "neo4j"):
+    def __init__(self, uri: Optional[str] = None,
+                 auth: Optional[Tuple[str, str]] = None,
+                 database: Optional[str] = None):
+        # Read Neo4j config from environment variables if not explicitly provided
+        uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        auth = auth or (
+            os.getenv("NEO4J_USER", "neo4j"),
+            os.getenv("NEO4J_PASSWORD", "your_strong_password"),
+        )
+        database = database or os.getenv("NEO4J_DATABASE", "neo4j")
         """
         Initialize Neo4j service.
         

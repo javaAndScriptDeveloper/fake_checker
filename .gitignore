@@ -5,3 +5,7 @@ __pycache__/
 *.env
 config/config.yaml
 app.log
+
+# Generated model artifacts
+models/*.joblib
+models/clickbait_model_version.txt

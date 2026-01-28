@@ -1,13 +1,58 @@
+import os
+from contextlib import contextmanager
+from typing import Optional, Type
+
 from automapper import mapper
-from sqlalchemy import (Column, DateTime, ForeignKey, Integer, MetaData,
+from sqlalchemy import (Column, DateTime, ForeignKey, Integer, Index, MetaData,
                         Numeric, String, Text, create_engine, func, text, Boolean)
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from enums import PLATFORM_TYPE
 
-engine = create_engine('postgresql://postgres:password@localhost:5432/fake_checker')
 
+def _build_connection_string() -> str:
+    """Build PostgreSQL connection string from environment variables."""
+    user = os.getenv("DB_USER", "postgres")
+    password = os.getenv("DB_PASSWORD", "password")
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "5432")
+    name = os.getenv("DB_NAME", "fake_checker")
+    return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+
+
+engine = create_engine(
+    _build_connection_string(),
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+)
+
+SessionFactory = sessionmaker(bind=engine)
+
+# Default session for backwards compatibility
 session = Session(engine)
+
+
+@contextmanager
+def get_session():
+    """Context manager for database sessions with proper commit/rollback.
+
+    Usage:
+        with get_session() as s:
+            s.add(obj)
+            # auto-commits on exit, auto-rollbacks on exception
+    """
+    s = SessionFactory()
+    try:
+        yield s
+        s.commit()
+    except Exception:
+        s.rollback()
+        raise
+    finally:
+        s.close()
 
 
 class Base(DeclarativeBase):
@@ -17,7 +62,7 @@ class Base(DeclarativeBase):
 class Source(Base):
     __tablename__ = "sources"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    external_id = Column(String, nullable=False)
+    external_id = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     name = Column(String, nullable=False)
     rating = Column(Numeric, nullable=True)
@@ -98,10 +143,10 @@ class Note(Base):
     is_propaganda = Column(Boolean)
     reason = Column(Text, nullable=True)
     amount_of_propaganda_scores = Column(Numeric, nullable=True)
-    hash = Column(String)
-    source_id = Column(Integer, ForeignKey('sources.id'), nullable=False)
+    hash = Column(String, index=True)
+    source_id = Column(Integer, ForeignKey('sources.id'), nullable=False, index=True)
     reposted_from_source_id = Column(Integer, ForeignKey('sources.id'), nullable=True)
-    created_at = Column(DateTime, default=func.now(), server_default=func.now())
+    created_at = Column(DateTime, default=func.now(), server_default=func.now(), index=True)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     @classmethod
@@ -217,56 +262,56 @@ def initialize_database():
 
 class BaseDao:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.session = session
 
-    def create(self, *model):
+    def create(self, *model: Base) -> None:
         self.session.add_all(model)
         self.session.commit()
 
-    def get_by_id(self, model_class, record_id):
+    def get_by_id(self, model_class: Type[Base], record_id: int) -> Optional[Base]:
         return self.session.query(model_class).get(record_id)
 
 
 class NoteDao(BaseDao):
 
-    def get_notes(self):
+    def get_notes(self) -> list[Note]:
         return self.session.query(Note).all()
 
-    def get_by_id(self, record_id):
+    def get_by_id(self, record_id: int) -> Optional[Note]:
         return super().get_by_id(Note, record_id)
 
-    def get_by_hash(self, hash):
+    def get_by_hash(self, hash: str) -> Optional[Note]:
         return self.session.query(Note).filter_by(hash=hash).first()
 
-    def get_by_source_id(self, source_id):
+    def get_by_source_id(self, source_id: int) -> list[Note]:
         return self.session.query(Note).filter_by(source_id=source_id).all()
 
-    def get_upper_third_rating(self):
+    def get_upper_third_rating(self) -> float:
         notes = self.session.query(Note).all()
         if not notes:
             return 100
 
         total_scores = sorted([note.total_score for note in notes], reverse=True)
-        upper_third_index = max(1, len(total_scores) // 3)  # At least one value in the upper third
+        upper_third_index = max(1, len(total_scores) // 3)
         upper_third_scores = total_scores[upper_third_index:]
 
         return sum(upper_third_scores) / len(upper_third_scores)
 
-    def update(self, model_to_update):
+    def update(self, model_to_update: Note) -> None:
         model_from_db = self.get_by_id(model_to_update.__class__, model_to_update.id)
         model_from_db.name = model_to_update.name
         self.session.commit()
 
-    def save(self, *models_to_save):
+    def save(self, *models_to_save: Note) -> None:
         for model_to_save in models_to_save:
             model_from_db = self.get_by_id(model_to_save.id)
-            if (model_from_db == None):
+            if model_from_db is None:
                 self.session.add_all(models_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
 
-    def get_last_note(self):
+    def get_last_note(self) -> Optional[Note]:
         return (
             self.session.query(Note)
             .order_by(Note.created_at.desc())
@@ -276,24 +321,24 @@ class NoteDao(BaseDao):
 
 class SourceDao(BaseDao):
 
-    def get_all(self):
+    def get_all(self) -> list[Source]:
         return self.session.query(Source).all()
 
-    def get_by_id(self, record_id) -> Source:
+    def get_by_id(self, record_id: int) -> Optional[Source]:
         return super().get_by_id(Source, record_id)
 
-    def get_by_external_id(self, external_id) -> Source:
+    def get_by_external_id(self, external_id: str) -> Optional[Source]:
         sources = self.session.query(Source).filter_by(external_id=str(external_id)).all()
-        if (len(sources) == 0):
+        if len(sources) == 0:
             return None
         return sources[0]
 
-    def update_rating(self, id, new_rating):
+    def update_rating(self, id: int, new_rating: float) -> None:
         initial_model = self.get_by_id(id)
         initial_model.rating = new_rating
         self.session.commit()
 
-    def calculate_rating(self, source_id):
+    def calculate_rating(self, source_id: int) -> Optional[float]:
         notes = self.session.query(Note).filter_by(source_id=source_id).all()
         if notes:
             total_scores = [note.total_score for note in notes]
@@ -301,21 +346,21 @@ class SourceDao(BaseDao):
         else:
             return None
 
-    def save(self, *models_to_save):
+    def save(self, *models_to_save: Source) -> None:
         for model_to_save in models_to_save:
             model_from_db = self.get_by_id(model_to_save.id)
-            if (model_from_db == None):
+            if model_from_db is None:
                 self.session.add(model_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
 
 class Migration:
 
-    def __init__(self, note_dao: NoteDao, source_dao: SourceDao):
+    def __init__(self, note_dao: NoteDao, source_dao: SourceDao) -> None:
         self.note_dao = note_dao
         self.source_dao = source_dao
 
-    def save_initial_sources(self, source_dao: SourceDao):
+    def save_initial_sources(self, source_dao: SourceDao) -> None:
         initial_sources = [
             Source(id=1, name='1', external_id="1", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
             Source(id=2, name='2', external_id="2", platform=PLATFORM_TYPE.TELEGRAM.name, is_hidden=True),
@@ -360,5 +405,5 @@ class Migration:
         ]
         source_dao.save(*initial_sources)
 
-    def execute(self):
+    def execute(self) -> None:
         self.save_initial_sources(self.source_dao)

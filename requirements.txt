@@ -1,20 +1,35 @@
+# Core
 SQLAlchemy~=2.0.32
-textstat~=0.7.4
+psycopg2-binary
+neo4j~=5.20.0
+alembic>=1.13.0
+
+# ML / NLP
 transformers~=4.44.1
 nltk~=3.9.1
 sentence-transformers~=3.0.1
-python-telegram-bot~=21.4
+scikit-learn
+numpy==1.26.4
+textstat~=0.7.4
+joblib>=1.3.0
+
+# Web / API
 Flask~=3.0.3
 Flask-SocketIO~=5.3.6
-PyYAML~=6.0.2
-numpy==1.26.4
-psycopg2-binary
+python-telegram-bot~=21.4
 telethon
-scikit-learn
-black
-isort
-flake8
+
+# Validation / Configuration
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+PyYAML~=6.0.2
+
+# Utilities
 py-automapper
 deep_translator
 openai~=1.0.0
-neo4j~=5.20.0
+
+# Development
+black
+isort
+flake8
