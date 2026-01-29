@@ -14,9 +14,12 @@ from singletons import manager
 class AppDemo(QWidget):
     def __init__(self, manager: Manager):
         super().__init__()
-        self.setWindowTitle('Propaganda Checker App')
-        self.setGeometry(100, 100, 600, 400)
         self.manager = manager
+        self.translator = self.manager.translator
+        self.current_language = "ukrainian"
+
+        self.setWindowTitle(self.tr("window_title"))
+        self.setGeometry(100, 100, 600, 400)
 
         self.sources = self.manager.get_visible_sources()
         self.layout = QVBoxLayout()
@@ -26,19 +29,19 @@ class AppDemo(QWidget):
 
         self.tab_process = QWidget()
         self.init_process_tab()
-        self.tabs.addTab(self.tab_process, "Text Processor")
+        self.tabs.addTab(self.tab_process, self.tr("tab_process"))
 
         self.tab_table = QWidget()
         self.init_table_tab()
-        self.tabs.addTab(self.tab_table, "Result Table")
+        self.tabs.addTab(self.tab_table, self.tr("tab_table"))
 
         self.tab_ratings = QWidget()
         self.init_ratings_tab()
-        self.tabs.addTab(self.tab_ratings, "Ratings")
+        self.tabs.addTab(self.tab_ratings, self.tr("tab_ratings"))
 
         self.tab_system_info = QWidget()
         self.init_system_info_tab()
-        self.tabs.addTab(self.tab_system_info, "System Info")
+        self.tabs.addTab(self.tab_system_info, self.tr("tab_system_info"))
 
         self.setLayout(self.layout)
 
@@ -52,42 +55,79 @@ class AppDemo(QWidget):
         self.timer.timeout.connect(self.update_ratings)
         self.timer.start(5000)
 
+    def tr(self, key: str) -> str:
+        return self.translator.get_ui_text(key, self.current_language)
+
+    def on_language_changed(self, index: int):
+        self.current_language = self.language_dropdown.currentData()
+        self.update_ui_texts()
+
+    def update_ui_texts(self):
+        self.setWindowTitle(self.tr("window_title"))
+        self.tabs.setTabText(0, self.tr("tab_process"))
+        self.tabs.setTabText(1, self.tr("tab_table"))
+        self.tabs.setTabText(2, self.tr("tab_ratings"))
+        self.tabs.setTabText(3, self.tr("tab_system_info"))
+        self.source_label.setText(self.tr("select_source"))
+        self.language_label.setText(self.tr("select_language"))
+        self.title_input.setPlaceholderText(self.tr("title_placeholder"))
+        self.text_input.setPlaceholderText(self.tr("text_placeholder"))
+        self.process_button.setText(self.tr("process_button"))
+        self.export_button.setText(self.tr("export_csv"))
+        self.fechner_label.setText(self.tr("fehner_score"))
+        self.result_table.setHorizontalHeaderLabels(self.get_table_headers())
+        self.ratings_table.setHorizontalHeaderLabels([self.tr("name"), self.tr("rating")])
+
+    def get_table_headers(self):
+        return [
+            self.tr("source"), self.tr("text_data"),
+            self.tr("sentimental_score"), self.tr("triggered_keywords"),
+            self.tr("triggered_topics"), self.tr("text_simplicity"),
+            self.tr("confidence_factor"), self.tr("clickbait"),
+            self.tr("subjective"), self.tr("call_to_action"),
+            self.tr("repeated_take"), self.tr("repeated_note"),
+            self.tr("total_score"), self.tr("is_propaganda")
+        ]
+
     def init_process_tab(self):
         process_layout = QVBoxLayout()
 
         dropdown_layout = QHBoxLayout()
-        self.label = QLabel('Select Source:')
-        dropdown_layout.addWidget(self.label)
-
-        self.language_dropdown = QComboBox()
-        for language in self.manager.get_available_translations():
-            self.language_dropdown.addItem(language['label'], language['value'])
-        self.language_dropdown.setCurrentIndex(0)
-        dropdown_layout.addWidget(QLabel("Select Language:"))
-        dropdown_layout.addWidget(self.language_dropdown)
+        self.source_label = QLabel(self.tr("select_source"))
+        dropdown_layout.addWidget(self.source_label)
 
         self.dropdown = QComboBox()
         for source in self.sources:
             self.dropdown.addItem(f'{source.name} ({source.platform})', source.id)
         dropdown_layout.addWidget(self.dropdown)
 
+        self.language_label = QLabel(self.tr("select_language"))
+        dropdown_layout.addWidget(self.language_label)
+
+        self.language_dropdown = QComboBox()
+        for language in self.manager.get_available_translations():
+            self.language_dropdown.addItem(language['label'], language['value'])
+        self.language_dropdown.setCurrentIndex(0)
+        self.language_dropdown.currentIndexChanged.connect(self.on_language_changed)
+        dropdown_layout.addWidget(self.language_dropdown)
+
         process_layout.addLayout(dropdown_layout)
 
         self.title_input = QTextEdit()
-        self.title_input.setPlaceholderText("Enter title here...")
+        self.title_input.setPlaceholderText(self.tr("title_placeholder"))
         self.title_input.setFixedWidth(400)
         self.title_input.setFixedHeight(40)
         self.title_input.setLineWrapMode(QTextEdit.WidgetWidth)
         process_layout.addWidget(self.title_input)
 
         self.text_input = QTextEdit()
-        self.text_input.setPlaceholderText("Enter your text here...")
+        self.text_input.setPlaceholderText(self.tr("text_placeholder"))
         self.text_input.setFixedWidth(400)
         self.text_input.setFixedHeight(100)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
         process_layout.addWidget(self.text_input)
 
-        self.process_button = QPushButton('Process')
+        self.process_button = QPushButton(self.tr("process_button"))
         self.process_button.clicked.connect(self.process_data)
         process_layout.addWidget(self.process_button)
 
@@ -103,24 +143,18 @@ class AppDemo(QWidget):
 
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(14)
-        self.result_table.setHorizontalHeaderLabels([
-            "Source", "Text Data",
-            "Sentimental Score", "Triggered Keywords", "Triggered Topics", "Text Simplicity",
-            "Confidence Factor", "Clickbait", "Subjective", "Call to Action",
-            "Repeated Take", "Repeated Note", "Total Score", "Is Propaganda"
-        ])
+        self.result_table.setHorizontalHeaderLabels(self.get_table_headers())
         header = self.result_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
 
         table_layout.addWidget(self.result_table)
 
-        # Export Button in bottom right
         button_layout = QHBoxLayout()
         button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        export_button = QPushButton("Export to CSV")
-        export_button.clicked.connect(self.export_to_csv)
-        button_layout.addWidget(export_button)
+        self.export_button = QPushButton(self.tr("export_csv"))
+        self.export_button.clicked.connect(self.export_to_csv)
+        button_layout.addWidget(self.export_button)
 
         table_layout.addLayout(button_layout)
 
@@ -130,7 +164,7 @@ class AppDemo(QWidget):
         ratings_layout = QVBoxLayout()
         self.ratings_table = QTableWidget()
         self.ratings_table.setColumnCount(2)
-        self.ratings_table.setHorizontalHeaderLabels(["Name", "Rating"])
+        self.ratings_table.setHorizontalHeaderLabels([self.tr("name"), self.tr("rating")])
         header = self.ratings_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         ratings_layout.addWidget(self.ratings_table)
@@ -138,11 +172,11 @@ class AppDemo(QWidget):
 
     def init_system_info_tab(self):
         system_info_layout = QVBoxLayout()
-        self.fechner_label = QLabel("Fehner Score:")
+        self.fechner_label = QLabel(self.tr("fehner_score"))
         self.fechner_label.setStyleSheet("font-weight: bold; font-size: 16px;")
         system_info_layout.addWidget(self.fechner_label)
 
-        self.fechner_score_value = QLabel("Calculating...")
+        self.fechner_score_value = QLabel(self.tr("calculating"))
         self.fechner_score_value.setStyleSheet("font-size: 16px; color: green;")
         system_info_layout.addWidget(self.fechner_score_value)
 
@@ -166,17 +200,17 @@ class AppDemo(QWidget):
         note = self.manager.process(title, input_text, source_id, language)
 
         result_text = f"""
-            Sentimental Score: {note.sentimental_score}%<br>
-            Triggered Keywords: {note.triggered_keywords}%<br>
-            Triggered Topics: {note.triggered_topics}%<br>
-            Text Simplicity Deviation: {note.text_simplicity_deviation}%<br>
-            Confidence Factor: {note.confidence_factor}%<br>
-            Clickbait: {note.clickbait}%<br>
-            Subjective: {note.subjective}%<br>
-            Call to Action: {note.call_to_action}%<br>
-            Repeated Take: {note.repeated_take}%<br>
-            Repeated Note: {note.repeated_note}%<br>
-            <b>Total Score: {note.total_score}%</b>
+            {self.tr("sentimental_score")}: {note.sentimental_score}%<br>
+            {self.tr("triggered_keywords")}: {note.triggered_keywords}%<br>
+            {self.tr("triggered_topics")}: {note.triggered_topics}%<br>
+            {self.tr("text_simplicity_deviation")}: {note.text_simplicity_deviation}%<br>
+            {self.tr("confidence_factor")}: {note.confidence_factor}%<br>
+            {self.tr("clickbait")}: {note.clickbait}%<br>
+            {self.tr("subjective")}: {note.subjective}%<br>
+            {self.tr("call_to_action")}: {note.call_to_action}%<br>
+            {self.tr("repeated_take")}: {note.repeated_take}%<br>
+            {self.tr("repeated_note")}: {note.repeated_note}%<br>
+            <b>{self.tr("total_score")}: {note.total_score}%</b>
             """
         self.result_view.setHtml(result_text)
 

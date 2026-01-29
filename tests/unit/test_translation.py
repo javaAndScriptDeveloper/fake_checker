@@ -16,8 +16,42 @@ class TestTranslator:
         """Test translator initialization."""
         assert translator is not None
         assert len(translator.supported_translations_list) == 2
-        assert translator.supported_translations_list[0]["label"] == "English"
-        assert translator.supported_translations_list[1]["label"] == "Ukrainian"
+        assert translator.supported_translations_list[0]["label"] == "Українська"
+        assert translator.supported_translations_list[0]["value"] == "ukrainian"
+        assert translator.supported_translations_list[1]["label"] == "English"
+        assert translator.supported_translations_list[1]["value"] == "english"
+
+    def test_ui_translations_initialized(self, translator):
+        """Test UI translations dictionary is initialized."""
+        assert "english" in translator.ui_translations
+        assert "ukrainian" in translator.ui_translations
+        assert "window_title" in translator.ui_translations["english"]
+        assert "window_title" in translator.ui_translations["ukrainian"]
+
+    def test_get_ui_text_english(self, translator):
+        """Test getting UI text in English."""
+        result = translator.get_ui_text("window_title", "english")
+        assert result == "Propaganda Checker App"
+
+    def test_get_ui_text_ukrainian(self, translator):
+        """Test getting UI text in Ukrainian."""
+        result = translator.get_ui_text("window_title", "ukrainian")
+        assert result == "Перевірка на Пропаганду"
+
+    def test_get_ui_text_default_language(self, translator):
+        """Test default language is Ukrainian when not specified."""
+        result = translator.get_ui_text("window_title")
+        assert result == "Перевірка на Пропаганду"
+
+    def test_get_ui_text_unknown_key(self, translator):
+        """Test fallback for unknown translation key."""
+        result = translator.get_ui_text("unknown_key", "english")
+        assert result == "unknown_key"
+
+    def test_get_ui_text_unknown_language(self, translator):
+        """Test fallback to Ukrainian for unknown language."""
+        result = translator.get_ui_text("window_title", "spanish")
+        assert result == "Перевірка на Пропаганду"
     
     @patch('translation.GoogleTranslator')
     def test_translate_to_english_success(self, mock_translator_class, translator):
