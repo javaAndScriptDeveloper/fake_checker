@@ -1,11 +1,20 @@
 import os
 import sys
-from PyQt5.QtCore import QTimer
+import tempfile
+from PyQt5.QtCore import QTimer, QUrl
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QComboBox, QTextEdit, QPushButton, QLabel,
     QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSpacerItem, QSizePolicy
 )
 from PyQt5 import QtGui
+
+# Lazy import for QWebEngineView - may not be installed
+try:
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    HAS_WEBENGINE = True
+except ImportError:
+    HAS_WEBENGINE = False
+    QWebEngineView = None
 
 from manager import Manager
 from singletons import manager
@@ -23,6 +32,12 @@ class AppDemo(QWidget):
 
         self.sources = self.manager.get_visible_sources()
         self.layout = QVBoxLayout()
+
+        self.total_score_color_dict = [
+            {'range': (0.51, 1), 'color': QtGui.QColor(255, 102, 102)}, # red
+            {'range': (0.31, 0.5), 'color': QtGui.QColor(255, 255, 102)}, # yellow
+            {'range': (0, 0.3), 'color': QtGui.QColor(144, 238, 144)} # green
+        ]
 
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
@@ -43,13 +58,11 @@ class AppDemo(QWidget):
         self.init_system_info_tab()
         self.tabs.addTab(self.tab_system_info, self.tr("tab_system_info"))
 
-        self.setLayout(self.layout)
+        self.tab_graph = QWidget()
+        self.init_graph_tab()
+        self.tabs.addTab(self.tab_graph, self.tr("tab_graph"))
 
-        self.total_score_color_dict = [
-            {'range': (0.51, 1), 'color': QtGui.QColor(255, 102, 102)}, # red
-            {'range': (0.31, 0.5), 'color': QtGui.QColor(255, 255, 102)}, # yellow
-            {'range': (0, 0.3), 'color': QtGui.QColor(144, 238, 144)} # green
-        ]
+        self.setLayout(self.layout)
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_ratings)
@@ -68,6 +81,7 @@ class AppDemo(QWidget):
         self.tabs.setTabText(1, self.tr("tab_table"))
         self.tabs.setTabText(2, self.tr("tab_ratings"))
         self.tabs.setTabText(3, self.tr("tab_system_info"))
+        self.tabs.setTabText(4, self.tr("tab_graph"))
         self.source_label.setText(self.tr("select_source"))
         self.language_label.setText(self.tr("select_language"))
         self.title_input.setPlaceholderText(self.tr("title_placeholder"))
@@ -77,6 +91,8 @@ class AppDemo(QWidget):
         self.fechner_label.setText(self.tr("fehner_score"))
         self.result_table.setHorizontalHeaderLabels(self.get_table_headers())
         self.ratings_table.setHorizontalHeaderLabels([self.tr("name"), self.tr("rating")])
+        self.refresh_graph_btn.setText(self.tr("refresh_graph"))
+        self.graph_stats_table.setHorizontalHeaderLabels(self._get_graph_stats_headers())
 
     def get_table_headers(self):
         return [
@@ -182,6 +198,195 @@ class AppDemo(QWidget):
 
         self.update_fehner_score()
         self.tab_system_info.setLayout(system_info_layout)
+
+    def init_graph_tab(self):
+        """Initialize graph visualization tab."""
+        graph_layout = QVBoxLayout()
+
+        # Controls bar
+        controls = QHBoxLayout()
+        self.refresh_graph_btn = QPushButton(self.tr("refresh_graph"))
+        self.refresh_graph_btn.clicked.connect(self.refresh_graph)
+        controls.addWidget(self.refresh_graph_btn)
+
+        self.graph_stats_label = QLabel()
+        controls.addWidget(self.graph_stats_label)
+        controls.addStretch()
+        graph_layout.addLayout(controls)
+
+        # Web view for pyvis graph (or fallback label if not available)
+        if HAS_WEBENGINE:
+            self.graph_view = QWebEngineView()
+            graph_layout.addWidget(self.graph_view)
+        else:
+            self.graph_view = None
+            self.graph_fallback_label = QLabel(
+                "PyQtWebEngine not installed.\n"
+                "Run: pip install PyQtWebEngine pyvis networkx"
+            )
+            self.graph_fallback_label.setStyleSheet(
+                "font-size: 14px; color: #888; padding: 20px;"
+            )
+            graph_layout.addWidget(self.graph_fallback_label)
+
+        # Statistics table for influential sources
+        self.graph_stats_table = QTableWidget()
+        self.graph_stats_table.setColumnCount(4)
+        self.graph_stats_table.setHorizontalHeaderLabels(self._get_graph_stats_headers())
+        header = self.graph_stats_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        self.graph_stats_table.setMaximumHeight(150)
+        graph_layout.addWidget(self.graph_stats_table)
+
+        self.tab_graph.setLayout(graph_layout)
+
+        # Initial load
+        self.refresh_graph()
+
+    def _get_graph_stats_headers(self):
+        """Get headers for graph statistics table."""
+        return [
+            self.tr("name"),
+            self.tr("platform"),
+            self.tr("note_count"),
+            self.tr("avg_propaganda_score")
+        ]
+
+    def refresh_graph(self):
+        """Refresh graph visualization."""
+        # If PyQtWebEngine not installed, just update the stats table
+        if not HAS_WEBENGINE or self.graph_view is None:
+            self._update_graph_stats_table()
+            return
+
+        if not self.manager.is_neo4j_available():
+            unavailable_html = f"""
+            <html>
+            <body style="background-color: #222222; color: white;
+                         display: flex; justify-content: center; align-items: center;
+                         height: 100vh; margin: 0; font-family: Arial, sans-serif;">
+                <h2>{self.tr('graph_unavailable')}</h2>
+            </body>
+            </html>
+            """
+            self.graph_view.setHtml(unavailable_html)
+            self.graph_stats_label.setText("")
+            self.graph_stats_table.setRowCount(0)
+            return
+
+        data = self.manager.get_graph_network()
+        if data:
+            self._render_graph(data)
+            self._update_graph_stats_label(data)
+
+        self._update_graph_stats_table()
+
+    def _render_graph(self, data: dict):
+        """Render network using pyvis and display in QWebEngineView."""
+        if not HAS_WEBENGINE or self.graph_view is None:
+            return
+
+        try:
+            from pyvis.network import Network
+        except ImportError:
+            self.graph_view.setHtml("<h2>pyvis not installed</h2>")
+            return
+
+        # Use cdn_resources='in_line' to embed JS/CSS directly in HTML (avoids CORS issues)
+        net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white",
+                      cdn_resources='in_line')
+        net.barnes_hut(gravity=-3000, central_gravity=0.3, spring_length=200)
+
+        # Add nodes
+        for node in data.get('nodes', []):
+            if node['type'] == 'source':
+                net.add_node(
+                    node['id'],
+                    label=node.get('name', 'Unknown'),
+                    color='#4a90d9',
+                    shape='box',
+                    title=f"Source: {node.get('name', 'Unknown')}\nPlatform: {node.get('platform', 'N/A')}"
+                )
+            else:  # note
+                score = node.get('total_score', 0) or 0
+                color = self._score_to_color(score)
+                title_text = node.get('title', 'Untitled') or 'Untitled'
+                label = title_text[:20] + '...' if len(title_text) > 20 else title_text
+                net.add_node(
+                    node['id'],
+                    label=label,
+                    color=color,
+                    shape='dot',
+                    size=15,
+                    title=f"Note: {title_text}\nScore: {score:.2f}"
+                )
+
+        # Add edges
+        for edge in data.get('edges', []):
+            edge_color = '#888888'
+            if edge['type'] == 'PUBLISHED':
+                edge_color = '#4a90d9'
+            elif edge['type'] == 'REPOSTS_FROM':
+                edge_color = '#ff9900'
+            elif edge['type'] == 'REFERENCES':
+                edge_color = '#ff6666'
+
+            net.add_edge(
+                edge['from'],
+                edge['to'],
+                title=edge['type'],
+                color=edge_color
+            )
+
+        # Save to temp file and display
+        html_path = tempfile.mktemp(suffix='.html')
+        net.save_graph(html_path)
+        self.graph_view.load(QUrl.fromLocalFile(html_path))
+
+    def _score_to_color(self, score: float) -> str:
+        """Convert propaganda score to color (green -> yellow -> red)."""
+        if score is None:
+            return '#888888'
+        if score <= 0.3:
+            return '#90EE90'  # Light green
+        elif score <= 0.5:
+            return '#FFFF66'  # Yellow
+        else:
+            return '#FF6666'  # Red
+
+    def _update_graph_stats_label(self, data: dict):
+        """Update the statistics label with node/edge counts."""
+        nodes = data.get('nodes', [])
+        edges = data.get('edges', [])
+        source_count = sum(1 for n in nodes if n['type'] == 'source')
+        note_count = sum(1 for n in nodes if n['type'] == 'note')
+
+        stats_text = (
+            f"{self.tr('sources_label')}: {source_count} | "
+            f"{self.tr('notes_label')}: {note_count} | "
+            f"{self.tr('relationships_label')}: {len(edges)}"
+        )
+        self.graph_stats_label.setText(stats_text)
+
+    def _update_graph_stats_table(self):
+        """Update the influential sources table."""
+        stats = self.manager.get_graph_statistics()
+        self.graph_stats_table.setRowCount(0)
+
+        if not stats:
+            return
+
+        for stat in stats[:10]:  # Show top 10
+            row_position = self.graph_stats_table.rowCount()
+            self.graph_stats_table.insertRow(row_position)
+            self.graph_stats_table.setItem(row_position, 0, QTableWidgetItem(stat['name']))
+            self.graph_stats_table.setItem(row_position, 1, QTableWidgetItem(stat['platform'] or 'N/A'))
+            self.graph_stats_table.setItem(row_position, 2, QTableWidgetItem(str(stat['note_count'])))
+
+            avg_score = stat.get('avg_propaganda_score', 0)
+            score_item = QTableWidgetItem(f"{avg_score:.2f}")
+            self.apply_color_to_score(score_item, avg_score)
+            self.graph_stats_table.setItem(row_position, 3, score_item)
 
     def update_fehner_score(self):
         try:

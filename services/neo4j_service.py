@@ -57,6 +57,222 @@ class Neo4jService:
             logger.error(f"Error executing Neo4j write query: {e}", exc_info=True)
             return None, None
 
+    def _execute_read(self, query: str, parameters: Optional[dict] = None) -> Optional[list]:
+        """Helper for read operations, ensuring 'r' routing."""
+        try:
+            records, _, _ = self.driver.execute_query(
+                query, parameters_=parameters, database_=self.database, routing_="r"
+            )
+            return records
+        except Exception as e:
+            logger.error(f"Error executing Neo4j read query: {e}", exc_info=True)
+            return None
+
+    def is_connected(self) -> bool:
+        """Check if Neo4j connection is available."""
+        try:
+            self.driver.verify_connectivity()
+            return True
+        except Exception:
+            return False
+
+    def get_full_network(self, limit: int = 100) -> Optional[dict]:
+        """
+        Get sources, notes, and all relationships for visualization.
+
+        Args:
+            limit: Maximum number of nodes to return
+
+        Returns:
+            Dictionary with nodes and edges lists, or None if error
+        """
+        query = """
+        MATCH (s:Source)
+        OPTIONAL MATCH (s)-[:PUBLISHED]->(n:Note)
+        WITH s, collect(DISTINCT n)[0..$note_limit] AS notes
+        UNWIND notes + [null] AS note
+        WITH s, note
+        WHERE note IS NOT NULL OR NOT EXISTS((s)-[:PUBLISHED]->())
+        RETURN
+            collect(DISTINCT {
+                id: 'source_' + toString(s.postgres_id),
+                type: 'source',
+                name: s.name,
+                platform: s.platform,
+                rating: s.rating
+            }) AS sources,
+            collect(DISTINCT CASE WHEN note IS NOT NULL THEN {
+                id: 'note_' + toString(note.postgres_id),
+                type: 'note',
+                title: COALESCE(note.title, 'Untitled'),
+                total_score: note.total_score,
+                is_propaganda: note.is_propaganda
+            } END) AS notes
+        LIMIT 1
+        """
+
+        records = self._execute_read(query, {"note_limit": limit})
+        if not records:
+            return {"nodes": [], "edges": []}
+
+        sources = records[0]["sources"] if records[0]["sources"] else []
+        notes = [n for n in records[0]["notes"] if n is not None]
+        nodes = sources + notes
+
+        # Get edges (relationships)
+        edge_query = """
+        MATCH (s:Source)-[:PUBLISHED]->(n:Note)
+        RETURN 'source_' + toString(s.postgres_id) AS from_id,
+               'note_' + toString(n.postgres_id) AS to_id,
+               'PUBLISHED' AS type
+        UNION
+        MATCH (n:Note)-[:REPOSTS_FROM]->(s:Source)
+        RETURN 'note_' + toString(n.postgres_id) AS from_id,
+               'source_' + toString(s.postgres_id) AS to_id,
+               'REPOSTS_FROM' AS type
+        UNION
+        MATCH (n1:Note)-[:REFERENCES]->(n2:Note)
+        RETURN 'note_' + toString(n1.postgres_id) AS from_id,
+               'note_' + toString(n2.postgres_id) AS to_id,
+               'REFERENCES' AS type
+        """
+
+        edge_records = self._execute_read(edge_query)
+        edges = []
+        if edge_records:
+            for record in edge_records:
+                edges.append({
+                    "from": record["from_id"],
+                    "to": record["to_id"],
+                    "type": record["type"]
+                })
+
+        return {"nodes": nodes, "edges": edges}
+
+    def get_source_statistics(self) -> Optional[list]:
+        """
+        Get statistics per source: note count, avg propaganda score, repost count.
+
+        Returns:
+            List of source statistics dictionaries, or None if error
+        """
+        query = """
+        MATCH (s:Source)
+        OPTIONAL MATCH (s)-[:PUBLISHED]->(n:Note)
+        OPTIONAL MATCH (n2:Note)-[:REPOSTS_FROM]->(s)
+        WITH s,
+             count(DISTINCT n) AS note_count,
+             avg(n.total_score) AS avg_score,
+             count(DISTINCT n2) AS repost_count
+        RETURN s.name AS name,
+               s.platform AS platform,
+               note_count,
+               COALESCE(avg_score, 0) AS avg_propaganda_score,
+               repost_count
+        ORDER BY note_count DESC
+        """
+
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "name": r["name"],
+                "platform": r["platform"],
+                "note_count": r["note_count"],
+                "avg_propaganda_score": r["avg_propaganda_score"],
+                "repost_count": r["repost_count"]
+            }
+            for r in records
+        ]
+
+    def get_repost_chains(self, max_depth: int = 5) -> Optional[list]:
+        """
+        Get note propagation chains via REFERENCES relationships.
+
+        Args:
+            max_depth: Maximum chain depth to traverse
+
+        Returns:
+            List of repost chain dictionaries, or None if error
+        """
+        query = """
+        MATCH path = (n1:Note)-[:REFERENCES*1..5]->(n2:Note)
+        WHERE length(path) <= $max_depth
+        WITH n1, n2, length(path) AS chain_length
+        MATCH (s1:Source)-[:PUBLISHED]->(n1)
+        MATCH (s2:Source)-[:PUBLISHED]->(n2)
+        RETURN n1.title AS reposted_title,
+               s1.name AS reposting_source,
+               n2.title AS original_title,
+               s2.name AS original_source,
+               chain_length
+        ORDER BY chain_length DESC
+        LIMIT 50
+        """
+
+        records = self._execute_read(query, {"max_depth": max_depth})
+        if not records:
+            return []
+
+        return [
+            {
+                "reposted_title": r["reposted_title"],
+                "reposting_source": r["reposting_source"],
+                "original_title": r["original_title"],
+                "original_source": r["original_source"],
+                "chain_length": r["chain_length"]
+            }
+            for r in records
+        ]
+
+    def get_most_influential_sources(self, limit: int = 10) -> Optional[list]:
+        """
+        Get sources ranked by connection count (published + reposted).
+
+        Args:
+            limit: Maximum number of sources to return
+
+        Returns:
+            List of influential source dictionaries, or None if error
+        """
+        query = """
+        MATCH (s:Source)
+        OPTIONAL MATCH (s)-[:PUBLISHED]->(n:Note)
+        OPTIONAL MATCH (n2:Note)-[:REPOSTS_FROM]->(s)
+        WITH s,
+             count(DISTINCT n) AS published_count,
+             count(DISTINCT n2) AS reposted_count,
+             avg(n.total_score) AS avg_score
+        WITH s, published_count, reposted_count, avg_score,
+             published_count + reposted_count AS total_connections
+        RETURN s.name AS name,
+               s.platform AS platform,
+               published_count,
+               reposted_count,
+               total_connections,
+               COALESCE(avg_score, 0) AS avg_propaganda_score
+        ORDER BY total_connections DESC
+        LIMIT $limit
+        """
+
+        records = self._execute_read(query, {"limit": limit})
+        if not records:
+            return []
+
+        return [
+            {
+                "name": r["name"],
+                "platform": r["platform"],
+                "published_count": r["published_count"],
+                "reposted_count": r["reposted_count"],
+                "total_connections": r["total_connections"],
+                "avg_propaganda_score": r["avg_propaganda_score"]
+            }
+            for r in records
+        ]
+
     def save_source(self, source: Source) -> Optional[str]:
         """
         Save or update a Source in Neo4j.

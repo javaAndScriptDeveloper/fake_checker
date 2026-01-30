@@ -29,6 +29,11 @@ py-automapper
 deep_translator
 openai~=1.0.0
 
+# Graph Visualization
+pyvis>=0.3.0
+PyQtWebEngine>=5.15.0
+networkx>=3.0
+
 # Development
 black
 isort

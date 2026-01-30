@@ -289,3 +289,63 @@ class Manager:
             for row in data:
                 writer.writerow(row)
         logger.info(f"CSV exported to {file_path}")
+
+    def is_neo4j_available(self) -> bool:
+        """Check if Neo4j service is connected."""
+        if not self.neo4j_service:
+            return False
+        try:
+            return self.neo4j_service.is_connected()
+        except Exception:
+            return False
+
+    def get_graph_network(self, limit: int = 100):
+        """
+        Get graph data for visualization.
+
+        Args:
+            limit: Maximum number of nodes to return
+
+        Returns:
+            Dictionary with nodes and edges, or None if Neo4j unavailable
+        """
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_full_network(limit)
+        except Exception as e:
+            logger.error(f"Error fetching graph network: {e}", exc_info=True)
+            return None
+
+    def get_graph_statistics(self):
+        """
+        Get source statistics from graph.
+
+        Returns:
+            List of source statistics, or None if Neo4j unavailable
+        """
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_source_statistics()
+        except Exception as e:
+            logger.error(f"Error fetching graph statistics: {e}", exc_info=True)
+            return None
+
+    def get_influential_sources(self, limit: int = 10):
+        """
+        Get most influential sources from graph.
+
+        Args:
+            limit: Maximum number of sources to return
+
+        Returns:
+            List of influential sources, or None if Neo4j unavailable
+        """
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_most_influential_sources(limit)
+        except Exception as e:
+            logger.error(f"Error fetching influential sources: {e}", exc_info=True)
+            return None
