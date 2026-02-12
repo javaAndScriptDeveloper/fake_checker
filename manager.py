@@ -5,6 +5,8 @@ import os
 import time
 from datetime import datetime
 
+import networkx as nx
+
 from config.paths import COLDSTART_DIR
 from dal.dal import Note, NoteDao, SourceDao
 from processors.evaluation_processor import EvaluationContext, EvaluationProcessor
@@ -348,4 +350,148 @@ class Manager:
             return self.neo4j_service.get_most_influential_sources(limit)
         except Exception as e:
             logger.error(f"Error fetching influential sources: {e}", exc_info=True)
+            return None
+
+    def get_source_propaganda_profile(self, source_id: int):
+        """Get propaganda dimension profile for a source."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_source_propaganda_profile(source_id)
+        except Exception as e:
+            logger.error(f"Error fetching source propaganda profile: {e}", exc_info=True)
+            return None
+
+    def get_all_scores_distribution(self):
+        """Get all note scores distribution for histogram."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_all_scores_distribution()
+        except Exception as e:
+            logger.error(f"Error fetching scores distribution: {e}", exc_info=True)
+            return None
+
+    def get_temporal_scores(self, source_id: int = None):
+        """Get temporal scores for trend chart."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_temporal_scores(source_id)
+        except Exception as e:
+            logger.error(f"Error fetching temporal scores: {e}", exc_info=True)
+            return None
+
+    def get_dimension_correlation_data(self):
+        """Get dimension correlation data for heatmap."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_dimension_correlation_data()
+        except Exception as e:
+            logger.error(f"Error fetching dimension correlation data: {e}", exc_info=True)
+            return None
+
+    def get_note_dimension_breakdown(self, note_id: int):
+        """Get single note dimension breakdown."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_note_dimension_breakdown(note_id)
+        except Exception as e:
+            logger.error(f"Error fetching note dimension breakdown: {e}", exc_info=True)
+            return None
+
+    def get_platform_comparison(self):
+        """Get platform comparison data."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_platform_comparison()
+        except Exception as e:
+            logger.error(f"Error fetching platform comparison: {e}", exc_info=True)
+            return None
+
+    def get_source_repost_network(self):
+        """Get source repost network for community detection."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_source_repost_network()
+        except Exception as e:
+            logger.error(f"Error fetching source repost network: {e}", exc_info=True)
+            return None
+
+    def get_information_cascades(self):
+        """Get information cascade chains."""
+        if not self.is_neo4j_available():
+            return None
+        try:
+            return self.neo4j_service.get_information_cascades()
+        except Exception as e:
+            logger.error(f"Error fetching information cascades: {e}", exc_info=True)
+            return None
+
+    def compute_community_detection(self):
+        """
+        Compute community detection on source repost graph using greedy modularity.
+
+        Returns:
+            Dict mapping source_id -> community_index, or None
+        """
+        repost_data = self.get_source_repost_network()
+        if not repost_data:
+            return None
+
+        try:
+            G = nx.Graph()
+            for edge in repost_data:
+                G.add_edge(edge["from_id"], edge["to_id"], weight=edge["weight"])
+                G.nodes[edge["from_id"]]["name"] = edge["from_name"]
+                G.nodes[edge["to_id"]]["name"] = edge["to_name"]
+
+            if G.number_of_nodes() < 2:
+                return None
+
+            communities = nx.community.greedy_modularity_communities(G)
+            community_map = {}
+            for idx, community in enumerate(communities):
+                for node_id in community:
+                    community_map[node_id] = idx
+
+            return community_map
+        except Exception as e:
+            logger.error(f"Error computing community detection: {e}", exc_info=True)
+            return None
+
+    def compute_pagerank_and_centrality(self):
+        """
+        Compute PageRank and betweenness centrality on directed source repost graph.
+
+        Returns:
+            Dict with 'pagerank' and 'centrality' sub-dicts mapping source_id -> score, or None
+        """
+        repost_data = self.get_source_repost_network()
+        if not repost_data:
+            return None
+
+        try:
+            G = nx.DiGraph()
+            for edge in repost_data:
+                G.add_edge(edge["from_id"], edge["to_id"], weight=edge["weight"])
+                G.nodes[edge["from_id"]]["name"] = edge["from_name"]
+                G.nodes[edge["to_id"]]["name"] = edge["to_name"]
+
+            if G.number_of_nodes() < 2:
+                return None
+
+            pagerank = nx.pagerank(G, weight="weight")
+            centrality = nx.betweenness_centrality(G, weight="weight")
+
+            return {
+                "pagerank": pagerank,
+                "centrality": centrality
+            }
+        except Exception as e:
+            logger.error(f"Error computing pagerank/centrality: {e}", exc_info=True)
             return None

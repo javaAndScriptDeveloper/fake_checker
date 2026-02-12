@@ -16,6 +16,11 @@ except ImportError:
     HAS_WEBENGINE = False
     QWebEngineView = None
 
+from ui.charts import (
+    RadarChart, HistogramChart, TemporalTrendChart,
+    CorrelationHeatmap, DimensionBreakdownChart, PlatformComparisonChart,
+    DIMENSION_LABEL_KEYS
+)
 from manager import Manager
 from singletons import manager
 
@@ -62,6 +67,10 @@ class AppDemo(QWidget):
         self.init_graph_tab()
         self.tabs.addTab(self.tab_graph, self.tr("tab_graph"))
 
+        self.tab_statistics = QWidget()
+        self.init_statistics_tab()
+        self.tabs.addTab(self.tab_statistics, self.tr("tab_statistics"))
+
         self.setLayout(self.layout)
 
         self.timer = QTimer()
@@ -82,6 +91,7 @@ class AppDemo(QWidget):
         self.tabs.setTabText(2, self.tr("tab_ratings"))
         self.tabs.setTabText(3, self.tr("tab_system_info"))
         self.tabs.setTabText(4, self.tr("tab_graph"))
+        self.tabs.setTabText(5, self.tr("tab_statistics"))
         self.source_label.setText(self.tr("select_source"))
         self.language_label.setText(self.tr("select_language"))
         self.title_input.setPlaceholderText(self.tr("title_placeholder"))
@@ -93,6 +103,11 @@ class AppDemo(QWidget):
         self.ratings_table.setHorizontalHeaderLabels([self.tr("name"), self.tr("rating")])
         self.refresh_graph_btn.setText(self.tr("refresh_graph"))
         self.graph_stats_table.setHorizontalHeaderLabels(self._get_graph_stats_headers())
+        self.stats_refresh_btn.setText(self.tr("refresh_statistics"))
+        self.community_btn.setText(self.tr("show_communities"))
+        self.pagerank_btn.setText(self.tr("show_pagerank"))
+        self.fehner_a_btn.setText(self.tr("show_fehner_a"))
+        self.cascades_btn.setText(self.tr("show_cascades"))
 
     def get_table_headers(self):
         return [
@@ -209,6 +224,26 @@ class AppDemo(QWidget):
         self.refresh_graph_btn.clicked.connect(self.refresh_graph)
         controls.addWidget(self.refresh_graph_btn)
 
+        self.community_btn = QPushButton(self.tr("show_communities"))
+        self.community_btn.setCheckable(True)
+        self.community_btn.clicked.connect(self._on_graph_overlay_changed)
+        controls.addWidget(self.community_btn)
+
+        self.pagerank_btn = QPushButton(self.tr("show_pagerank"))
+        self.pagerank_btn.setCheckable(True)
+        self.pagerank_btn.clicked.connect(self._on_graph_overlay_changed)
+        controls.addWidget(self.pagerank_btn)
+
+        self.fehner_a_btn = QPushButton(self.tr("show_fehner_a"))
+        self.fehner_a_btn.setCheckable(True)
+        self.fehner_a_btn.clicked.connect(self._on_graph_overlay_changed)
+        controls.addWidget(self.fehner_a_btn)
+
+        self.cascades_btn = QPushButton(self.tr("show_cascades"))
+        self.cascades_btn.setCheckable(True)
+        self.cascades_btn.clicked.connect(self._on_graph_overlay_changed)
+        controls.addWidget(self.cascades_btn)
+
         self.graph_stats_label = QLabel()
         controls.addWidget(self.graph_stats_label)
         controls.addStretch()
@@ -281,8 +316,17 @@ class AppDemo(QWidget):
 
         self._update_graph_stats_table()
 
-    def _render_graph(self, data: dict):
-        """Render network using pyvis and display in QWebEngineView."""
+    def _render_graph(self, data: dict, overlay=None):
+        """Render network using pyvis and display in QWebEngineView.
+
+        Args:
+            data: Network data with nodes and edges
+            overlay: Optional dict with overlay configuration:
+                - community_map: dict of source_id -> community_index
+                - pagerank: dict of source_id -> pagerank score
+                - fehner_a: bool to highlight Fehner A notes
+                - cascades: list of cascade chain data
+        """
         if not HAS_WEBENGINE or self.graph_view is None:
             return
 
@@ -292,37 +336,108 @@ class AppDemo(QWidget):
             self.graph_view.setHtml("<h2>pyvis not installed</h2>")
             return
 
-        # Use cdn_resources='in_line' to embed JS/CSS directly in HTML (avoids CORS issues)
         net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white",
                       cdn_resources='in_line')
         net.barnes_hut(gravity=-3000, central_gravity=0.3, spring_length=200)
 
+        overlay = overlay or {}
+        community_map = overlay.get("community_map")
+        pagerank = overlay.get("pagerank")
+        fehner_a = overlay.get("fehner_a", False)
+        cascade_data = overlay.get("cascades")
+
+        # Community colors palette
+        community_colors = [
+            '#4a90d9', '#ff6666', '#66ff66', '#ffff66', '#ff66ff',
+            '#66ffff', '#ff9933', '#9966ff', '#33cc33', '#cc3333',
+            '#6699cc', '#cc6699', '#99cc66'
+        ]
+
+        # If cascades mode, filter to only cascade-related nodes
+        cascade_node_ids = set()
+        if cascade_data:
+            for c in cascade_data:
+                cascade_node_ids.add(f"note_{c['from_note_id']}")
+                cascade_node_ids.add(f"note_{c['to_note_id']}")
+
         # Add nodes
         for node in data.get('nodes', []):
+            if cascade_data and node['id'] not in cascade_node_ids:
+                # In cascade mode, also include source nodes for visible notes
+                if node['type'] == 'source':
+                    # Check if any cascade note belongs to this source
+                    has_cascade_note = False
+                    for edge in data.get('edges', []):
+                        if edge['type'] == 'PUBLISHED' and edge['to'] in cascade_node_ids and edge['from'] == node['id']:
+                            has_cascade_note = True
+                            break
+                    if not has_cascade_note:
+                        continue
+                else:
+                    continue
+
             if node['type'] == 'source':
+                color = '#4a90d9'
+                size = 25
+
+                # Extract postgres_id from node id
+                source_pg_id = None
+                try:
+                    source_pg_id = int(node['id'].replace('source_', ''))
+                except (ValueError, AttributeError):
+                    pass
+
+                if community_map and source_pg_id in community_map:
+                    comm_idx = community_map[source_pg_id]
+                    color = community_colors[comm_idx % len(community_colors)]
+
+                if pagerank and source_pg_id in pagerank:
+                    rank = pagerank[source_pg_id]
+                    size = max(15, min(60, rank * 1000))
+
                 net.add_node(
                     node['id'],
                     label=node.get('name', 'Unknown'),
-                    color='#4a90d9',
+                    color=color,
                     shape='box',
+                    size=size,
                     title=f"Source: {node.get('name', 'Unknown')}\nPlatform: {node.get('platform', 'N/A')}"
                 )
             else:  # note
                 score = node.get('total_score', 0) or 0
                 color = self._score_to_color(score)
+                node_size = 15
+
+                if fehner_a and node.get('fehner_type') == 'A':
+                    color = '#ff0000'
+                    node_size = 22
+
                 title_text = node.get('title', 'Untitled') or 'Untitled'
                 label = title_text[:20] + '...' if len(title_text) > 20 else title_text
+                title_info = f"Note: {title_text}\nScore: {score:.2f}"
+                if node.get('fehner_type'):
+                    title_info += f"\nFehner: {node['fehner_type']}"
+
                 net.add_node(
                     node['id'],
                     label=label,
                     color=color,
                     shape='dot',
-                    size=15,
-                    title=f"Note: {title_text}\nScore: {score:.2f}"
+                    size=node_size,
+                    title=title_info
                 )
 
         # Add edges
-        for edge in data.get('edges', []):
+        edges_to_add = data.get('edges', [])
+        if cascade_data:
+            # In cascade mode, only show REFERENCES and PUBLISHED edges for cascade nodes
+            edges_to_add = [
+                e for e in edges_to_add
+                if e['type'] == 'REFERENCES' or
+                (e['type'] == 'PUBLISHED' and e['to'] in cascade_node_ids)
+            ]
+
+        for edge in edges_to_add:
             edge_color = '#888888'
             if edge['type'] == 'PUBLISHED':
                 edge_color = '#4a90d9'
@@ -387,6 +502,235 @@ class AppDemo(QWidget):
             score_item = QTableWidgetItem(f"{avg_score:.2f}")
             self.apply_color_to_score(score_item, avg_score)
             self.graph_stats_table.setItem(row_position, 3, score_item)
+
+    def _on_graph_overlay_changed(self):
+        """Handle overlay toggle button clicks — re-render graph with overlays."""
+        if not HAS_WEBENGINE or self.graph_view is None:
+            return
+        if not self.manager.is_neo4j_available():
+            return
+
+        data = self.manager.get_graph_network()
+        if not data:
+            return
+
+        overlay = {}
+
+        if self.community_btn.isChecked():
+            community_map = self.manager.compute_community_detection()
+            if community_map:
+                overlay["community_map"] = community_map
+
+        if self.pagerank_btn.isChecked():
+            pr_data = self.manager.compute_pagerank_and_centrality()
+            if pr_data:
+                overlay["pagerank"] = pr_data["pagerank"]
+
+        if self.fehner_a_btn.isChecked():
+            overlay["fehner_a"] = True
+
+        if self.cascades_btn.isChecked():
+            cascades = self.manager.get_information_cascades()
+            if cascades:
+                overlay["cascades"] = cascades
+
+        self._render_graph(data, overlay)
+        self._update_graph_stats_label(data)
+
+    def init_statistics_tab(self):
+        """Initialize statistics/charts tab."""
+        stats_layout = QVBoxLayout()
+
+        # Controls bar
+        controls = QHBoxLayout()
+
+        self.stats_refresh_btn = QPushButton(self.tr("refresh_statistics"))
+        self.stats_refresh_btn.clicked.connect(self.refresh_statistics)
+        controls.addWidget(self.stats_refresh_btn)
+
+        self.chart_selector = QComboBox()
+        self._chart_types = [
+            ("radar_chart", RadarChart),
+            ("histogram_chart", HistogramChart),
+            ("temporal_chart", TemporalTrendChart),
+            ("correlation_chart", CorrelationHeatmap),
+            ("breakdown_chart", DimensionBreakdownChart),
+            ("platform_chart", PlatformComparisonChart),
+        ]
+        for key, _ in self._chart_types:
+            self.chart_selector.addItem(self.tr(key), key)
+        self.chart_selector.currentIndexChanged.connect(self._on_chart_type_changed)
+        controls.addWidget(self.chart_selector)
+
+        self.stats_source_selector = QComboBox()
+        self.stats_source_selector.addItem(self.tr("all_sources"), None)
+        for source in self.sources:
+            self.stats_source_selector.addItem(f"{source.name} ({source.platform})", source.id)
+        self.stats_source_selector.currentIndexChanged.connect(self._on_stats_source_changed)
+        controls.addWidget(self.stats_source_selector)
+
+        self.stats_note_selector = QComboBox()
+        self.stats_note_selector.hide()
+        self.stats_note_selector.currentIndexChanged.connect(self._on_stats_note_changed)
+        controls.addWidget(self.stats_note_selector)
+
+        controls.addStretch()
+        stats_layout.addLayout(controls)
+
+        # Chart area
+        self.current_chart = None
+        self.chart_container = QVBoxLayout()
+        stats_layout.addLayout(self.chart_container)
+
+        # Status label
+        self.stats_status_label = QLabel()
+        self.stats_status_label.setStyleSheet("color: #888; padding: 4px;")
+        stats_layout.addWidget(self.stats_status_label)
+
+        self.tab_statistics.setLayout(stats_layout)
+
+    def _get_dimension_labels(self):
+        """Get localized dimension labels."""
+        return [self.tr(k) for k in DIMENSION_LABEL_KEYS]
+
+    def _on_chart_type_changed(self, index):
+        """Swap chart widget and toggle selector visibility."""
+        chart_key = self.chart_selector.currentData()
+
+        # Show source selector for radar/temporal/breakdown
+        needs_source = chart_key in ("radar_chart", "temporal_chart", "breakdown_chart")
+        self.stats_source_selector.setVisible(needs_source)
+
+        # Show note selector only for breakdown
+        needs_note = chart_key == "breakdown_chart"
+        self.stats_note_selector.setVisible(needs_note)
+        if needs_note:
+            self._populate_note_selector()
+
+        self.refresh_statistics()
+
+    def _on_stats_source_changed(self, index):
+        """Handle source selector change."""
+        chart_key = self.chart_selector.currentData()
+        if chart_key == "breakdown_chart":
+            self._populate_note_selector()
+        self.refresh_statistics()
+
+    def _on_stats_note_changed(self, index):
+        """Handle note selector change."""
+        self.refresh_statistics()
+
+    def _populate_note_selector(self):
+        """Populate note selector from graph data."""
+        self.stats_note_selector.blockSignals(True)
+        self.stats_note_selector.clear()
+
+        data = self.manager.get_graph_network()
+        if data:
+            for node in data.get("nodes", []):
+                if node["type"] == "note":
+                    try:
+                        note_id = int(node["id"].replace("note_", ""))
+                    except (ValueError, AttributeError):
+                        continue
+                    title = node.get("title", "Untitled") or "Untitled"
+                    label = title[:40] + '...' if len(title) > 40 else title
+                    self.stats_note_selector.addItem(label, note_id)
+
+        self.stats_note_selector.blockSignals(False)
+
+    def refresh_statistics(self):
+        """Fetch data and render the selected chart."""
+        if not self.manager.is_neo4j_available():
+            self._set_stats_status(self.tr("graph_unavailable"))
+            if self.current_chart:
+                self.current_chart.show_no_data(self.tr("graph_unavailable"))
+            return
+
+        chart_key = self.chart_selector.currentData()
+        if not chart_key:
+            return
+
+        # Find chart class
+        chart_cls = None
+        for key, cls in self._chart_types:
+            if key == chart_key:
+                chart_cls = cls
+                break
+
+        if not chart_cls:
+            return
+
+        # Replace current chart widget
+        if self.current_chart:
+            self.chart_container.removeWidget(self.current_chart)
+            self.current_chart.setParent(None)
+            self.current_chart.deleteLater()
+
+        self.current_chart = chart_cls()
+        self.chart_container.addWidget(self.current_chart)
+
+        labels = self._get_dimension_labels()
+        source_id = self.stats_source_selector.currentData()
+
+        try:
+            if chart_key == "radar_chart":
+                if source_id is None:
+                    self.current_chart.show_no_data(self.tr("select_source"))
+                    self._set_stats_status("")
+                    return
+                data = self.manager.get_source_propaganda_profile(source_id)
+                self.current_chart.plot(data, labels)
+                if data:
+                    self._set_stats_status(f"{self.tr('notes_analyzed')}: {data.get('note_count', 0)}")
+                else:
+                    self._set_stats_status(self.tr("no_data_available"))
+
+            elif chart_key == "histogram_chart":
+                data = self.manager.get_all_scores_distribution()
+                self.current_chart.plot(data)
+                self._set_stats_status(f"{self.tr('notes_analyzed')}: {len(data) if data else 0}")
+
+            elif chart_key == "temporal_chart":
+                data = self.manager.get_temporal_scores(source_id)
+                self.current_chart.plot(data)
+                self._set_stats_status(f"{self.tr('notes_analyzed')}: {len(data) if data else 0}")
+
+            elif chart_key == "correlation_chart":
+                data = self.manager.get_dimension_correlation_data()
+                self.current_chart.plot(data, labels)
+                self._set_stats_status(f"{self.tr('notes_analyzed')}: {len(data) if data else 0}")
+
+            elif chart_key == "breakdown_chart":
+                note_id = self.stats_note_selector.currentData()
+                if note_id is None:
+                    self.current_chart.show_no_data(self.tr("select_note"))
+                    self._set_stats_status("")
+                    return
+                data = self.manager.get_note_dimension_breakdown(note_id)
+                self.current_chart.plot(data, labels)
+                self._set_stats_status("")
+
+            elif chart_key == "platform_chart":
+                data = self.manager.get_platform_comparison()
+                self.current_chart.plot(data)
+                if data:
+                    platforms = len(data)
+                    total_notes = sum(d.get("note_count", 0) for d in data)
+                    self._set_stats_status(
+                        f"{self.tr('sources_detected')}: {platforms} | "
+                        f"{self.tr('notes_analyzed')}: {total_notes}"
+                    )
+                else:
+                    self._set_stats_status(self.tr("no_data_available"))
+
+        except Exception as e:
+            self.current_chart.show_no_data(f"Error: {e}")
+            self._set_stats_status(f"Error: {e}")
+
+    def _set_stats_status(self, text):
+        """Set the statistics status label text."""
+        self.stats_status_label.setText(text)
 
     def update_fehner_score(self):
         try:

@@ -106,7 +106,8 @@ class Neo4jService:
                 type: 'note',
                 title: COALESCE(note.title, 'Untitled'),
                 total_score: note.total_score,
-                is_propaganda: note.is_propaganda
+                is_propaganda: note.is_propaganda,
+                fehner_type: note.fehner_type
             } END) AS notes
         LIMIT 1
         """
@@ -269,6 +270,361 @@ class Neo4jService:
                 "reposted_count": r["reposted_count"],
                 "total_connections": r["total_connections"],
                 "avg_propaganda_score": r["avg_propaganda_score"]
+            }
+            for r in records
+        ]
+
+    def get_source_propaganda_profile(self, source_postgres_id: int) -> Optional[dict]:
+        """
+        Get average of all 13 propaganda dimensions for a source (radar chart data).
+
+        Args:
+            source_postgres_id: PostgreSQL ID of the source
+
+        Returns:
+            Dictionary with dimension averages, or None if error
+        """
+        query = """
+        MATCH (s:Source {postgres_id: $source_id})-[:PUBLISHED]->(n:Note)
+        RETURN s.name AS source_name,
+               avg(n.sentimental_score) AS avg_sentimental,
+               avg(n.triggered_keywords) AS avg_keywords,
+               avg(n.triggered_topics) AS avg_topics,
+               avg(n.text_simplicity_deviation) AS avg_simplicity,
+               avg(n.confidence_factor) AS avg_confidence,
+               avg(n.clickbait) AS avg_clickbait,
+               avg(n.subjective) AS avg_subjective,
+               avg(n.call_to_action) AS avg_cta,
+               avg(n.repeated_take) AS avg_repeated_take,
+               avg(n.repeated_note) AS avg_repeated_note,
+               avg(n.messianism) AS avg_messianism,
+               avg(n.generalization_of_opponents) AS avg_generalization,
+               avg(n.opposition_to_opponents) AS avg_opposition,
+               count(n) AS note_count
+        """
+        records = self._execute_read(query, {"source_id": source_postgres_id})
+        if not records or records[0]["note_count"] == 0:
+            return None
+
+        r = records[0]
+        return {
+            "source_name": r["source_name"],
+            "note_count": r["note_count"],
+            "dimensions": {
+                "sentimental": r["avg_sentimental"] or 0,
+                "keywords": r["avg_keywords"] or 0,
+                "topics": r["avg_topics"] or 0,
+                "simplicity": r["avg_simplicity"] or 0,
+                "confidence": r["avg_confidence"] or 0,
+                "clickbait": r["avg_clickbait"] or 0,
+                "subjective": r["avg_subjective"] or 0,
+                "call_to_action": r["avg_cta"] or 0,
+                "repeated_take": r["avg_repeated_take"] or 0,
+                "repeated_note": r["avg_repeated_note"] or 0,
+                "messianism": r["avg_messianism"] or 0,
+                "generalization": r["avg_generalization"] or 0,
+                "opposition": r["avg_opposition"] or 0,
+            }
+        }
+
+    def get_all_scores_distribution(self) -> Optional[list]:
+        """
+        Get all note total_scores with fehner_type for histogram data.
+
+        Returns:
+            List of dicts with total_score and fehner_type, or empty list
+        """
+        query = """
+        MATCH (n:Note)
+        WHERE n.total_score IS NOT NULL
+        RETURN n.total_score AS total_score,
+               n.fehner_type AS fehner_type
+        ORDER BY n.total_score
+        """
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "total_score": r["total_score"],
+                "fehner_type": r["fehner_type"]
+            }
+            for r in records
+        ]
+
+    def get_temporal_scores(self, source_postgres_id: int = None) -> Optional[list]:
+        """
+        Get notes with timestamps grouped by source for trend line data.
+
+        Args:
+            source_postgres_id: Optional filter by source ID
+
+        Returns:
+            List of dicts with source_name, timestamp, total_score
+        """
+        if source_postgres_id:
+            query = """
+            MATCH (s:Source {postgres_id: $source_id})-[:PUBLISHED]->(n:Note)
+            WHERE n.created_at IS NOT NULL AND n.total_score IS NOT NULL
+            RETURN s.name AS source_name,
+                   s.postgres_id AS source_id,
+                   n.created_at AS timestamp,
+                   n.total_score AS total_score
+            ORDER BY n.created_at
+            """
+            params = {"source_id": source_postgres_id}
+        else:
+            query = """
+            MATCH (s:Source)-[:PUBLISHED]->(n:Note)
+            WHERE n.created_at IS NOT NULL AND n.total_score IS NOT NULL
+            RETURN s.name AS source_name,
+                   s.postgres_id AS source_id,
+                   n.created_at AS timestamp,
+                   n.total_score AS total_score
+            ORDER BY n.created_at
+            """
+            params = None
+
+        records = self._execute_read(query, params)
+        if not records:
+            return []
+
+        return [
+            {
+                "source_name": r["source_name"],
+                "source_id": r["source_id"],
+                "timestamp": r["timestamp"],
+                "total_score": r["total_score"]
+            }
+            for r in records
+        ]
+
+    def get_dimension_correlation_data(self) -> Optional[list]:
+        """
+        Get all 13 dimension values for all notes (correlation matrix data).
+
+        Returns:
+            List of dicts, each containing all 13 dimension values for a note
+        """
+        query = """
+        MATCH (n:Note)
+        WHERE n.total_score IS NOT NULL
+        RETURN n.sentimental_score AS sentimental,
+               n.triggered_keywords AS keywords,
+               n.triggered_topics AS topics,
+               n.text_simplicity_deviation AS simplicity,
+               n.confidence_factor AS confidence,
+               n.clickbait AS clickbait,
+               n.subjective AS subjective,
+               n.call_to_action AS call_to_action,
+               n.repeated_take AS repeated_take,
+               n.repeated_note AS repeated_note,
+               n.messianism AS messianism,
+               n.generalization_of_opponents AS generalization,
+               n.opposition_to_opponents AS opposition
+        """
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "sentimental": r["sentimental"] or 0,
+                "keywords": r["keywords"] or 0,
+                "topics": r["topics"] or 0,
+                "simplicity": r["simplicity"] or 0,
+                "confidence": r["confidence"] or 0,
+                "clickbait": r["clickbait"] or 0,
+                "subjective": r["subjective"] or 0,
+                "call_to_action": r["call_to_action"] or 0,
+                "repeated_take": r["repeated_take"] or 0,
+                "repeated_note": r["repeated_note"] or 0,
+                "messianism": r["messianism"] or 0,
+                "generalization": r["generalization"] or 0,
+                "opposition": r["opposition"] or 0,
+            }
+            for r in records
+        ]
+
+    def get_note_dimension_breakdown(self, note_postgres_id: int) -> Optional[dict]:
+        """
+        Get a single note's 13 dimension values for bar chart data.
+
+        Args:
+            note_postgres_id: PostgreSQL ID of the note
+
+        Returns:
+            Dictionary with all dimension values, or None
+        """
+        query = """
+        MATCH (n:Note {postgres_id: $note_id})
+        RETURN n.title AS title,
+               n.total_score AS total_score,
+               n.sentimental_score AS sentimental,
+               n.triggered_keywords AS keywords,
+               n.triggered_topics AS topics,
+               n.text_simplicity_deviation AS simplicity,
+               n.confidence_factor AS confidence,
+               n.clickbait AS clickbait,
+               n.subjective AS subjective,
+               n.call_to_action AS call_to_action,
+               n.repeated_take AS repeated_take,
+               n.repeated_note AS repeated_note,
+               n.messianism AS messianism,
+               n.generalization_of_opponents AS generalization,
+               n.opposition_to_opponents AS opposition
+        """
+        records = self._execute_read(query, {"note_id": note_postgres_id})
+        if not records:
+            return None
+
+        r = records[0]
+        return {
+            "title": r["title"] or "Untitled",
+            "total_score": r["total_score"] or 0,
+            "dimensions": {
+                "sentimental": r["sentimental"] or 0,
+                "keywords": r["keywords"] or 0,
+                "topics": r["topics"] or 0,
+                "simplicity": r["simplicity"] or 0,
+                "confidence": r["confidence"] or 0,
+                "clickbait": r["clickbait"] or 0,
+                "subjective": r["subjective"] or 0,
+                "call_to_action": r["call_to_action"] or 0,
+                "repeated_take": r["repeated_take"] or 0,
+                "repeated_note": r["repeated_note"] or 0,
+                "messianism": r["messianism"] or 0,
+                "generalization": r["generalization"] or 0,
+                "opposition": r["opposition"] or 0,
+            }
+        }
+
+    def get_platform_comparison(self) -> Optional[list]:
+        """
+        Get per-platform aggregated stats for grouped bar chart data.
+
+        Returns:
+            List of dicts with platform name and aggregated dimension averages
+        """
+        query = """
+        MATCH (s:Source)-[:PUBLISHED]->(n:Note)
+        WHERE s.platform IS NOT NULL AND n.total_score IS NOT NULL
+        WITH s.platform AS platform,
+             avg(n.sentimental_score) AS avg_sentimental,
+             avg(n.triggered_keywords) AS avg_keywords,
+             avg(n.triggered_topics) AS avg_topics,
+             avg(n.text_simplicity_deviation) AS avg_simplicity,
+             avg(n.confidence_factor) AS avg_confidence,
+             avg(n.clickbait) AS avg_clickbait,
+             avg(n.subjective) AS avg_subjective,
+             avg(n.call_to_action) AS avg_cta,
+             avg(n.total_score) AS avg_total,
+             count(n) AS note_count
+        RETURN platform,
+               avg_sentimental, avg_keywords, avg_topics,
+               avg_simplicity, avg_confidence, avg_clickbait,
+               avg_subjective, avg_cta, avg_total, note_count
+        ORDER BY note_count DESC
+        """
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "platform": r["platform"],
+                "note_count": r["note_count"],
+                "avg_total": r["avg_total"] or 0,
+                "avg_sentimental": r["avg_sentimental"] or 0,
+                "avg_keywords": r["avg_keywords"] or 0,
+                "avg_topics": r["avg_topics"] or 0,
+                "avg_simplicity": r["avg_simplicity"] or 0,
+                "avg_confidence": r["avg_confidence"] or 0,
+                "avg_clickbait": r["avg_clickbait"] or 0,
+                "avg_subjective": r["avg_subjective"] or 0,
+                "avg_cta": r["avg_cta"] or 0,
+            }
+            for r in records
+        ]
+
+    def get_source_repost_network(self) -> Optional[list]:
+        """
+        Get source-to-source repost edges with weights for community detection.
+
+        Returns:
+            List of dicts with from_source, to_source, and weight
+        """
+        query = """
+        MATCH (n:Note)-[:REPOSTS_FROM]->(s2:Source)
+        MATCH (s1:Source)-[:PUBLISHED]->(n)
+        WHERE s1 <> s2
+        WITH s1, s2, count(n) AS weight
+        RETURN s1.postgres_id AS from_id,
+               s1.name AS from_name,
+               s2.postgres_id AS to_id,
+               s2.name AS to_name,
+               weight
+        ORDER BY weight DESC
+        """
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "from_id": r["from_id"],
+                "from_name": r["from_name"],
+                "to_id": r["to_id"],
+                "to_name": r["to_name"],
+                "weight": r["weight"]
+            }
+            for r in records
+        ]
+
+    def get_information_cascades(self) -> Optional[list]:
+        """
+        Get REFERENCES chains with timestamps and scores for cascade view.
+
+        Returns:
+            List of cascade chain dicts
+        """
+        query = """
+        MATCH path = (n1:Note)-[:REFERENCES*1..5]->(n2:Note)
+        WITH n1, n2, length(path) AS depth
+        MATCH (s1:Source)-[:PUBLISHED]->(n1)
+        MATCH (s2:Source)-[:PUBLISHED]->(n2)
+        RETURN n1.postgres_id AS from_note_id,
+               n1.title AS from_title,
+               n1.total_score AS from_score,
+               n1.created_at AS from_timestamp,
+               s1.name AS from_source,
+               n2.postgres_id AS to_note_id,
+               n2.title AS to_title,
+               n2.total_score AS to_score,
+               n2.created_at AS to_timestamp,
+               s2.name AS to_source,
+               depth
+        ORDER BY depth DESC, n1.created_at
+        LIMIT 100
+        """
+        records = self._execute_read(query)
+        if not records:
+            return []
+
+        return [
+            {
+                "from_note_id": r["from_note_id"],
+                "from_title": r["from_title"] or "Untitled",
+                "from_score": r["from_score"] or 0,
+                "from_timestamp": r["from_timestamp"],
+                "from_source": r["from_source"],
+                "to_note_id": r["to_note_id"],
+                "to_title": r["to_title"] or "Untitled",
+                "to_score": r["to_score"] or 0,
+                "to_timestamp": r["to_timestamp"],
+                "to_source": r["to_source"],
+                "depth": r["depth"]
             }
             for r in records
         ]

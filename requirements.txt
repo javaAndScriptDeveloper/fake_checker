@@ -33,6 +33,7 @@ openai~=1.0.0
 pyvis>=0.3.0
 PyQtWebEngine>=5.15.0
 networkx>=3.0
+matplotlib>=3.7.0
 
 # Development
 black
