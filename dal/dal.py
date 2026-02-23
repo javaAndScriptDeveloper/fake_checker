@@ -255,6 +255,21 @@ class Note(Base):
         return [row[0] for row in session.query(cls.generalization_of_opponents_raw).all()]
 
 
+class AudioMetadata(Base):
+    """Metadata for audio files that were transcribed to create notes."""
+    __tablename__ = "audio_metadata"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    note_id = Column(Integer, ForeignKey('notes.id', ondelete='CASCADE'), nullable=False, index=True)
+    original_filename = Column(String(255), nullable=False)
+    duration_seconds = Column(Numeric, nullable=False)
+    detected_language = Column(String(50), nullable=True)
+    whisper_model_version = Column(String(50), nullable=True)
+    audio_format = Column(String(10), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=func.now(), server_default=func.now())
+
+
 def initialize_database():
     """Initialize database tables. Call this explicitly when needed."""
     Base.metadata.create_all(engine)
@@ -353,6 +368,24 @@ class SourceDao(BaseDao):
                 self.session.add(model_to_save)
             model_from_db = mapper.to(model_to_save.__class__).map(model_to_save)
         self.session.commit()
+
+
+class AudioMetadataDao(BaseDao):
+    """Data access object for audio metadata."""
+
+    def get_by_note_id(self, note_id: int) -> Optional[AudioMetadata]:
+        """Get audio metadata for a specific note."""
+        return self.session.query(AudioMetadata).filter_by(note_id=note_id).first()
+
+    def get_all(self) -> list[AudioMetadata]:
+        """Get all audio metadata records."""
+        return self.session.query(AudioMetadata).all()
+
+    def delete_by_note_id(self, note_id: int) -> None:
+        """Delete audio metadata for a specific note."""
+        self.session.query(AudioMetadata).filter_by(note_id=note_id).delete()
+        self.session.commit()
+
 
 class Migration:
 

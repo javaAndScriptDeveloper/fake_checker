@@ -90,6 +90,16 @@ class Translator:
                 "dim_messianism": "Messianism",
                 "dim_generalization": "Generalization",
                 "dim_opposition": "Opposition",
+                # Audio-related translations
+                "audio_input": "Audio Input",
+                "upload_audio_file": "📁 Upload Audio File",
+                "select_audio_file": "Select Audio File",
+                "invalid_audio": "Invalid Audio File",
+                "transcribing_audio": "Transcribing audio...",
+                "transcription_complete": "Transcription complete ({duration}, detected: {language})",
+                "transcription_failed": "Transcription Failed",
+                "transcription_error": "Error during transcription",
+                "audio_not_available": "Audio Not Available",
             },
             "ukrainian": {
                 "window_title": "Перевірка на Пропаганду",
@@ -165,6 +175,16 @@ class Translator:
                 "dim_messianism": "Месіанізм",
                 "dim_generalization": "Узагальнення",
                 "dim_opposition": "Протиставлення",
+                # Переклади для аудіо
+                "audio_input": "Аудіо Вхід",
+                "upload_audio_file": "📁 Завантажити Аудіо Файл",
+                "select_audio_file": "Виберіть Аудіо Файл",
+                "invalid_audio": "Невірний Аудіо Файл",
+                "transcribing_audio": "Транскрипція аудіо...",
+                "transcription_complete": "Транскрипція завершена ({duration}, мова: {language})",
+                "transcription_failed": "Помилка Транскрипції",
+                "transcription_error": "Помилка під час транскрипції",
+                "audio_not_available": "Аудіо Недоступне",
             }
         }
 

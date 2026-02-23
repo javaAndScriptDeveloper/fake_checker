@@ -8,7 +8,7 @@ from datetime import datetime
 import networkx as nx
 
 from config.paths import COLDSTART_DIR
-from dal.dal import Note, NoteDao, SourceDao
+from dal.dal import Note, NoteDao, SourceDao, AudioMetadata, AudioMetadataDao
 from processors.evaluation_processor import EvaluationContext, EvaluationProcessor
 from processors.fehner_processor import FehnerProcessor
 from translation import Translator
@@ -25,13 +25,15 @@ class Manager:
                  source_dao: SourceDao,
                  fehner_processor: FehnerProcessor,
                  translator: Translator,
-                 neo4j_service=None):
+                 neo4j_service=None,
+                 audio_metadata_dao: AudioMetadataDao = None):
         self.evaluation_processor = evaluation_processor
         self.note_dao = note_dao
         self.source_dao = source_dao
         self.fehner_processor = fehner_processor
         self.translator = translator
         self.neo4j_service = neo4j_service
+        self.audio_metadata_dao = audio_metadata_dao or AudioMetadataDao()
 
         self.coldstart(COLDSTART_DIR)
         #self.process_initial("/home/vampir/lolitech/dissertation/data/initial")
@@ -111,6 +113,32 @@ class Manager:
                 logger.error(f"Failed to save to Neo4j: {e}", exc_info=True)
         
         return note
+
+    def save_audio_metadata(self, note_id: int, audio_meta: dict) -> None:
+        """
+        Save audio metadata linked to a processed note.
+
+        Args:
+            note_id: ID of the note that was created from audio transcription
+            audio_meta: Dictionary with audio metadata from AudioService.transcribe_file()
+                Expected keys: original_filename, duration, language,
+                               whisper_model_version, audio_format, file_size_bytes
+        """
+        try:
+            metadata = AudioMetadata(
+                note_id=note_id,
+                original_filename=audio_meta.get('original_filename', 'unknown'),
+                duration_seconds=audio_meta.get('duration', 0.0),
+                detected_language=audio_meta.get('language'),
+                whisper_model_version=audio_meta.get('whisper_model_version'),
+                audio_format=audio_meta.get('audio_format'),
+                file_size_bytes=audio_meta.get('file_size_bytes')
+            )
+            self.audio_metadata_dao.create(metadata)
+            logger.info(f"Saved audio metadata for note {note_id}: {audio_meta.get('original_filename')}")
+        except Exception as e:
+            logger.error(f"Failed to save audio metadata: {e}", exc_info=True)
+            # Don't raise - audio metadata is supplementary, shouldn't break main flow
 
     def _resolve_text_hash(self, text: str) -> str:
         return hashlib.md5(text.encode('utf-8')).hexdigest()

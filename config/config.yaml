@@ -2,3 +2,17 @@ similarity_threshold : 0.85
 average_news_simplicity: 50
 openai_api_key:
 is_chatgpt_processor_enabled: false
+
+# Audio transcription settings
+audio:
+  whisper_model_size: medium  # Options: tiny, base, small, medium, large, large-v3
+  max_file_size_mb: 100
+  max_duration_minutes: 30
+  device: cpu  # Options: cpu, cuda (requires CUDA-enabled PyTorch)
+  supported_formats:
+    - .wav
+    - .mp3
+    - .ogg
+    - .m4a
+    - .flac
+    - .webm

@@ -1,5 +1,8 @@
 import sys
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from PyQt5.QtWidgets import QApplication
 
 from singletons import manager

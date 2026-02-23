@@ -4,7 +4,8 @@ import tempfile
 from PyQt5.QtCore import QTimer, QUrl
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QComboBox, QTextEdit, QPushButton, QLabel,
-    QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSpacerItem, QSizePolicy
+    QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSpacerItem, QSizePolicy,
+    QFileDialog, QMessageBox
 )
 from PyQt5 import QtGui
 
@@ -21,6 +22,7 @@ from ui.charts import (
     CorrelationHeatmap, DimensionBreakdownChart, PlatformComparisonChart,
     DIMENSION_LABEL_KEYS
 )
+from ui.audio_widgets import TranscriptionWorker
 from manager import Manager
 from singletons import manager
 
@@ -31,6 +33,8 @@ class AppDemo(QWidget):
         self.manager = manager
         self.translator = self.manager.translator
         self.current_language = "ukrainian"
+        self.current_audio_metadata = None  # Store metadata until note is saved
+        self.transcription_worker = None  # Background transcription worker
 
         self.setWindowTitle(self.tr("window_title"))
         self.setGeometry(100, 100, 600, 400)
@@ -143,6 +147,33 @@ class AppDemo(QWidget):
         dropdown_layout.addWidget(self.language_dropdown)
 
         process_layout.addLayout(dropdown_layout)
+
+        # Audio Input Section
+        audio_section_layout = QVBoxLayout()
+
+        # Section header
+        audio_label = QLabel(self.tr("audio_input"))
+        audio_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        audio_section_layout.addWidget(audio_label)
+
+        # File upload button
+        self.audio_upload_btn = QPushButton(self.tr("upload_audio_file"))
+        self.audio_upload_btn.setFixedSize(200, 40)
+        self.audio_upload_btn.clicked.connect(self.handle_audio_upload)
+        audio_section_layout.addWidget(self.audio_upload_btn)
+
+        # Status/info display
+        self.audio_status_label = QLabel("")
+        self.audio_status_label.setWordWrap(True)
+        self.audio_status_label.setStyleSheet("color: #666; font-style: italic;")
+        audio_section_layout.addWidget(self.audio_status_label)
+
+        process_layout.addLayout(audio_section_layout)
+
+        # Separator
+        separator = QLabel("─" * 50)
+        separator.setStyleSheet("color: #ccc;")
+        process_layout.addWidget(separator)
 
         self.title_input = QTextEdit()
         self.title_input.setPlaceholderText(self.tr("title_placeholder"))
@@ -740,6 +771,99 @@ class AppDemo(QWidget):
             self.fechner_score_value.setText(f"Error: {e}")
             print(f"Error calculating Fechner Score: {e}")
 
+    def handle_audio_upload(self):
+        """Handle audio file selection and transcription."""
+        # Import here to avoid circular import and handle missing audio_service gracefully
+        try:
+            from singletons import audio_service
+        except (ImportError, AttributeError):
+            QMessageBox.warning(
+                self,
+                self.tr("audio_not_available"),
+                "Audio service is not available. Please check that audio dependencies are installed."
+            )
+            return
+
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("select_audio_file"),
+            "",
+            "Audio Files (*.wav *.mp3 *.ogg *.m4a *.flac *.webm);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        # Validate file
+        is_valid, error_msg = audio_service.validate_audio_file(file_path)
+        if not is_valid:
+            QMessageBox.warning(self, self.tr("invalid_audio"), error_msg)
+            return
+
+        # Start transcription in background
+        self.start_transcription(file_path, audio_service)
+
+    def start_transcription(self, file_path: str, audio_service):
+        """Start background transcription worker."""
+        # Disable upload button during processing
+        self.audio_upload_btn.setEnabled(False)
+        self.audio_status_label.setText(self.tr("transcribing_audio"))
+
+        # Get selected language
+        language = self.language_dropdown.currentData()
+
+        # Create worker thread
+        self.transcription_worker = TranscriptionWorker(file_path, language, audio_service)
+        self.transcription_worker.transcription_complete.connect(self.on_transcription_complete)
+        self.transcription_worker.transcription_error.connect(self.on_transcription_error)
+        self.transcription_worker.progress_update.connect(self.on_transcription_progress)
+        self.transcription_worker.start()
+
+    def on_transcription_progress(self, status: str):
+        """Handle transcription progress updates."""
+        self.audio_status_label.setText(status)
+
+    def on_transcription_complete(self, result: dict):
+        """Handle successful transcription."""
+        # Extract results
+        text = result['text']
+        detected_lang = result['language']
+        duration = result['duration']
+
+        # Store metadata for later save
+        self.current_audio_metadata = result
+
+        # Auto-fill title if empty (use first 50 chars of transcription)
+        if not self.title_input.toPlainText().strip():
+            title = text[:50].strip() + ("..." if len(text) > 50 else "")
+            self.title_input.setPlainText(title)
+
+        # Populate text input
+        self.text_input.setPlainText(text)
+
+        # Update status
+        status_msg = self.tr("transcription_complete").format(
+            duration=f"{duration:.1f}s",
+            language=detected_lang
+        )
+        self.audio_status_label.setText(status_msg)
+        self.audio_status_label.setStyleSheet("color: #2e7d32; font-style: italic;")  # Green
+
+        # Re-enable upload button
+        self.audio_upload_btn.setEnabled(True)
+
+        # AUTO-PROCESS: Immediately trigger analysis
+        QTimer.singleShot(500, self.process_data)  # Small delay for UI update
+
+    def on_transcription_error(self, error_msg: str):
+        """Handle transcription failure."""
+        QMessageBox.critical(self, self.tr("transcription_failed"), error_msg)
+        self.audio_status_label.setText(self.tr("transcription_error"))
+        self.audio_status_label.setStyleSheet("color: #c62828; font-style: italic;")  # Red
+        self.audio_upload_btn.setEnabled(True)
+        self.current_audio_metadata = None
+
     def process_data(self):
         source_id = self.dropdown.currentData()
         title = self.title_input.toPlainText()
@@ -747,6 +871,11 @@ class AppDemo(QWidget):
         language = self.language_dropdown.currentData()
 
         note = self.manager.process(title, input_text, source_id, language)
+
+        # Save audio metadata if this came from audio transcription
+        if self.current_audio_metadata and note and note.id:
+            self.manager.save_audio_metadata(note.id, self.current_audio_metadata)
+            self.current_audio_metadata = None  # Clear after saving
 
         result_text = f"""
             {self.tr("sentimental_score")}: {note.sentimental_score}%<br>
